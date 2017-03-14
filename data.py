@@ -1,8 +1,8 @@
 import numpy as np
 
 class DataSet:
-    def __init__(self):
-        self._data = []
+    def __init__(self, data=[]):
+        self._data = list(data)
 
     def get(self, i):
         return self._data[i]
@@ -12,6 +12,9 @@ class DataSet:
 
     def get_size(self):
         return len(self._data)
+
+    def copy(self):
+        return DataSet(data=list(self._data))
 
 
 class FeatureToken:
@@ -25,9 +28,9 @@ class FeatureType:
 
 
 class FeatureSet:
-    def __init__(self):
-        self._feature_types = []
-        self._size = 0
+    def __init__(self, feature_types=[]):
+        self._feature_types = list(feature_types)
+        self._size = sum([feature_type.get_size() for feature_type in feature_types])
 
     def has_feature_type(self, feature_type):
         for f in self._feature_types:
@@ -70,6 +73,9 @@ class FeatureSet:
                 offset += self._feature_types[i].get_size()
         return None
 
+    def copy(self):
+        return FeatureSet(feature_types=self._feature_types)
+
 
 class DataFeatureMatrix:
     def __init__(self, data, feature_set):
@@ -97,6 +103,16 @@ class DataFeatureMatrix:
         self._mat = []
         for i in range(self._data.get_size()):
             self._mat.append(self._feature_set.compute(self._data.get(i)))
+
+    def shuffle(self):
+        perm = np.random.permutation(len(self._mat))
+        shuffled_mat = []
+        shuffled_data = []
+        for i in range(len(perm)):
+            shuffled_mat.append(self._mat[perm[i]])
+            shuffled_data.append(self._data.get(perm[i]))
+        self._data = DataSet(data=shuffled_data)
+        self._mat = shuffled_mat
 
 
 class UnaryRule:

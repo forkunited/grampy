@@ -119,6 +119,14 @@ class ClosedFormula:
                 new_g.append((v, self._g[v]))
         return ClosedFormula(str(new_exp), nltk.Assignment(self._g.domain, new_g))
 
+    def __str__(self):
+        new_exp = self.get_exp()
+        for v in self._g:
+            v_exp = nltk.sem.Expression.fromstring(v)
+            value_exp = nltk.sem.Expression.fromstring(self._g[v])
+            new_exp = new_exp.replace(v_exp.variable, value_exp, False)
+        return str(new_exp)
+
 
 class OpenFormula:
     def __init__(self, domain, form, variables, init_g={}):
@@ -128,7 +136,6 @@ class OpenFormula:
         self._init_g = init_g
         self._closed_forms = self._make_closed_forms(domain, form, variables, init_g)
 
-        
     def _make_closed_forms(self, domain, form, variables, init_g):
         assgn_lists = self._make_assignments_helper(domain, variables, init_g, 0, [[]])
         closed = []
@@ -156,6 +163,9 @@ class OpenFormula:
 
         return self._make_assignments_helper(domain, variables, init_g, i+1, next_lists)
 
+    def get_init_g(self):
+        return self._init_g
+
     def exp_matches(self, open_form):
         return self.get_exp().equiv(open_form.get_exp())
 
@@ -176,6 +186,9 @@ class FeatureToken(data.FeatureToken):
 
     def get_closed_form(self):
         return self._closed_form
+
+    def __str__(self):
+        return str(self._closed_form)
 
 
 class FeatureType(data.FeatureType):
@@ -198,7 +211,41 @@ class FeatureType(data.FeatureType):
         return FeatureToken(self._open_form.get_closed_forms()[index])
 
     def equals(self, feature_type):
+        my_g = self._open_form.get_init_g()
+        g = feature_type.get_open_form().get_init_g()
+
+        for v in my_g:
+            if v not in g or g[v] != my_g[v]:
+                return False 
+
         return self._open_form.exp_matches(feature_type.get_open_form())
+
+
+class FeatureTokenTop(data.FeatureToken):
+    def __init__(self):
+        data.FeatureToken.__init__(self)
+
+    def __str__(self):
+        return "T"
+
+
+class FeatureTypeTop(data.FeatureType):
+    def __init__(self):
+        data.FeatureType.__init__(self)
+
+    def compute(self, datum):
+        return [1.0]
+
+    def get_size(self):
+        return 1
+
+    def get_token(self, index):
+        return FeatureTokenTop()
+
+    def equals(self, feature_type):
+        return isinstance(feature_type, FeatureTypeTop)
+
+
 
 
 class UnaryRule(data.UnaryRule):
