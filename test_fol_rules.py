@@ -70,7 +70,7 @@ class TestFOLRules(unittest.TestCase):
 
         # FIXME Maybe do later: Unary rule remove existential
 
-        # Unary rule 0 => 1
+        # Unary rule 0 => 2
         def p_2_fn(cf):
             ofs = []
             for var in cf.get_g():

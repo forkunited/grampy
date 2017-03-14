@@ -255,8 +255,12 @@ class UnaryRule(data.UnaryRule):
         self._rhs_open_form_fn = rhs_open_form_fn
     
     def matches(self, feature_token):
+        if not isinstance(feature_token, FeatureToken):
+            return False
+
         if self._lhs_closed_form is None:
             return True
+
         f_form = feature_token.get_closed_form()
 
         if not self._lhs_closed_form.matches(f_form):
@@ -280,8 +284,11 @@ class BinaryRule(data.BinaryRule):
         self._ordered = ordered
 
     def matches(self, feature_token1, feature_token2):
+        if not isinstance(feature_token1, FeatureToken) or not isinstance(feature_token2, FeatureToken):
+            return False 
         if self._lhs_closed_form1 is None and self._lhs_closed_form2 is None:
             return True
+
 
         f_form1 = feature_token1.get_closed_form()
         f_form2 = feature_token2.get_closed_form()

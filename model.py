@@ -77,7 +77,9 @@ class LogLinearModel:
 
     # See http://aclweb.org/anthology/P/P09/P09-1054.pdf
     def train_l1(self, D, F, iterations=100, C=0.001, eta_0=1.0, alpha=0.8):
-        M = data.DataFeatureMatrix(D.copy(), F.copy())
+        D = D.copy()
+        F = F.copy()
+        M = data.DataFeatureMatrix(D, F)
         u = 0
         w = np.zeros(F.get_size())
         q = np.zeros(F.get_size())
@@ -91,6 +93,53 @@ class LogLinearModel:
 
             eta = self._eta(k, eta_0, alpha, N)
             u += eta*C/N
+            j = k % N
+            self._update_weights_l1(M, j, eta, w, u, q)
+
+        self._w = w
+        self._F = F
+
+    def _extend_model_g(self, M, R, t, w, q):
+        F = M.get_feature_set()
+
+        expand_f = []
+        for i in range(len(w)):
+            if w[i] > t:
+                expand_f.append(F.get_feature_token(i))
+
+        new_f = R.apply(expand_f)
+        M.extend(new_f)
+
+        new_w = np.zeros(F.get_size() - len(w))
+        new_q = np.zeros(F.get_size() - len(q))
+
+        w = np.concatenate((w, new_w))
+        q = np.concatenate((q, new_q))
+
+        return w, q
+
+
+    def train_l1_g(self, D, F, R, t=0.0, iterations=100, C=0.001, eta_0=1.0, alpha=0.8):
+        D = D.copy()
+        F = F.copy()
+        M = data.DataFeatureMatrix(D, F)
+        u = 0
+        w = np.zeros(F.get_size())
+        q = np.zeros(F.get_size())
+        N = D.get_size()
+
+        for k in range(iterations):
+            eta = self._eta(k, eta_0, alpha, N)
+            if k % N == 0:
+                M.shuffle()
+                ll, l1, nz = self._ll_l1(M,w,C)
+                w, q = self._extend_model_g(M, R, t, w, q)
+                print "Training l1-g model iteration " + str(k) + " eta: " + str(eta) + " ll: " + str(ll) + " l1: " + str(l1) + " nz: " + str(nz)
+
+
+            eta = self._eta(k, eta_0, alpha, N)
+            u += eta*C/N
+
             j = k % N
             self._update_weights_l1(M, j, eta, w, u, q)
 
