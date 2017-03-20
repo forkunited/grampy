@@ -8,6 +8,12 @@ import data
 
 class TestFOLModel(unittest.TestCase):
 
+    def _print_table(self, hist, name):
+        print "iters, " + name
+        for i in range(len(hist["iters"])):
+            print "(" + str(hist["iters"][i]) + ", " + str(hist[name][i]) + ")"
+        print "\n"
+
     def test_model(self):
         print "Starting test..."
         data_size = 3000
@@ -59,10 +65,10 @@ class TestFOLModel(unittest.TestCase):
         D = fol.DataSet.make_random(data_size, domain, properties, [], label_fn, seed=1)
 
         modell1 = model.LogLinearModel()
-        modell1.train_l1(D, F_full, iterations=140001, C=16.0, eta_0=1.0, alpha=0.8)
+        l1_hist = modell1.train_l1(D, F_full, iterations=140001, C=16.0, eta_0=1.0, alpha=0.8)
 
         modell1_g = model.LogLinearModel()
-        modell1_g.train_l1_g(D, F_0, R, t=0.04, iterations=140001, C=8.0, eta_0=1.0, alpha=0.8)
+        l1_g_hist = modell1_g.train_l1_g(D, F_0, R, t=0.04, iterations=140001, C=8.0, eta_0=1.0, alpha=0.8)
 
 
         print "True model"
@@ -74,7 +80,16 @@ class TestFOLModel(unittest.TestCase):
         print "l1-g model"
         print str(modell1_g)
 
-        #self.assertEqual('foo'.upper(), 'FOO')
+        print "l1 histories"
+        self._print_table(l1_hist, "lls")
+        self._print_table(l1_hist, "l1s")
+        self._print_table(l1_hist, "nzs")
+
+        print "l1-g histories"
+        self._print_table(l1_g_hist, "lls")
+        self._print_table(l1_g_hist, "l1s")
+        self._print_table(l1_g_hist, "nzs")
+
 
 if __name__ == '__main__':
     unittest.main()

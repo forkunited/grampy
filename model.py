@@ -84,20 +84,38 @@ class LogLinearModel:
         w = np.zeros(F.get_size())
         q = np.zeros(F.get_size())
         N = D.get_size()
+        iters = []
+        lls = []
+        l1s = []
+        nzs = []
         for k in range(iterations):
             eta = self._eta(k, eta_0, alpha, N)
             if k % N == 0:
                 M.shuffle()
                 ll, l1, nz = self._ll_l1(M,w,C)
+                
+                iters.append(k)
+                lls.append(ll)
+                l1s.append(l1)
+                nzs.append(nz)
+                
                 print "Training l1 model iteration " + str(k) + " eta: " + str(eta) + " ll: " + str(ll) + " l1: " + str(l1) + " nz: " + str(nz)
 
-            eta = self._eta(k, eta_0, alpha, N)
             u += eta*C/N
             j = k % N
             self._update_weights_l1(M, j, eta, w, u, q)
 
         self._w = w
         self._F = F
+
+        ret_history = dict()
+        ret_history["iters"] = iters
+        ret_history["lls"] = lls
+        ret_history["l1s"] = l1s
+        ret_history["nzs"] = nzs        
+
+        return ret_history
+
 
     def _extend_model_g(self, M, R, t, w, q):
         F = M.get_feature_set()
@@ -128,16 +146,25 @@ class LogLinearModel:
         q = np.zeros(F.get_size())
         N = D.get_size()
 
+        iters = []
+        lls = []
+        l1s = []
+        nzs = []
+
         for k in range(iterations):
             eta = self._eta(k, eta_0, alpha, N)
             if k % N == 0:
                 M.shuffle()
                 ll, l1, nz = self._ll_l1(M,w,C)
+                
+                iters.append(k)
+                lls.append(ll)
+                l1s.append(l1)
+                nzs.append(nz)
+
                 w, q = self._extend_model_g(M, R, t, w, q)
                 print "Training l1-g model iteration " + str(k) + " eta: " + str(eta) + " ll: " + str(ll) + " l1: " + str(l1) + " nz: " + str(nz)
 
-
-            eta = self._eta(k, eta_0, alpha, N)
             u += eta*C/N
 
             j = k % N
@@ -145,3 +172,12 @@ class LogLinearModel:
 
         self._w = w
         self._F = F
+
+        ret_history = dict()
+        ret_history["iters"] = iters
+        ret_history["lls"] = lls
+        ret_history["l1s"] = l1s
+        ret_history["nzs"] = nzs
+
+        return ret_history
+
