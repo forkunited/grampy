@@ -1,5 +1,7 @@
 #!/bin/bash
 
+PWD=`pwd` 
+export PYTHONPATH=$PYTHONPATH:${PWD}/../../../main/py/
 export PROVER9=<PATH TO PROVER BINARY>
 
 python test_fol_data.py

@@ -3,7 +3,7 @@ import numpy as np
 import nltk
 
 import model
-import fol
+import fol.rep as fol
 import data
 
 class TestFOLModel(unittest.TestCase):

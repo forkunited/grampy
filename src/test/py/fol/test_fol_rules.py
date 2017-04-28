@@ -1,6 +1,6 @@
 import unittest
 import data
-import fol
+import fol.rep as fol
 import nltk
 
 class TestFOLRules(unittest.TestCase):
