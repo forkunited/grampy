@@ -32,7 +32,7 @@ class PositionedAtom:
             return 7.0
         elif self._element == "F":
             return 9.0
-        else
+        else:
             return None
 
 
@@ -74,34 +74,34 @@ class Molecule:
         props = lines[1].split("\t")
         m._props = dict()
         m._props["id"] = props[0] # String identifier
-        m._props["A"] = float(props[1]) # A (GHz) - Rotational constant
-        m._props["B"] = float(props[2]) # B (GHz) - Rotational constant
-        m._props["C"] = float(props[3]) # C (GHz) - Rotational constant
-        m._props["mu"] = float(props[4]) # mu (D) - Dipole moment
-        m._props["alpha"] = float(props[5]) # alpha (a_0^3) - Isotropic polarizability
-        m._props["epsilon_HOMO"] = float(props[6]) # epsilon_HOMO (Ha) - Energy of HOMO
-        m._props["epsilon_LUMO"] = float(props[7]) # epsilon_LUMO (Ha) - Energy of LUMO
-        m._props["epsilon_gap"] = float(props[8]) # epsilon_gap (Ha) - Energy gap
-        m._props["R2"] = float(props[9]) # R^2 (a_0^2) - Electronic spatial extent
-        m._props["zpve"] = float(props[10]) # zpve (Ha) - Zero point vibrational energy
-        m._props["U_0"] = float(props[11]) # U_0 (Ha) - Internal energy at 0K
-        m._props["U"] = float(props[12]) # U (Ha) - Internal energy at 298.15K
-        m._props["H"] = float(props[13]) # H (Ha) - Enthalpy at 298.15K
-        m._props["G"] = float(props[14]) # G (Ha) - Free energy at 298.15K
-        m._props["C_v"] = float(props[15]) # C_v (cal/molK) - Heat capacity at 298.15K
+        m._props["A"] = float(props[1].replace("*^", "E")) # A (GHz) - Rotational constant
+        m._props["B"] = float(props[2].replace("*^", "E")) # B (GHz) - Rotational constant
+        m._props["C"] = float(props[3].replace("*^", "E")) # C (GHz) - Rotational constant
+        m._props["mu"] = float(props[4].replace("*^", "E")) # mu (D) - Dipole moment
+        m._props["alpha"] = float(props[5].replace("*^", "E")) # alpha (a_0^3) - Isotropic polarizability
+        m._props["epsilon_HOMO"] = float(props[6].replace("*^", "E")) # epsilon_HOMO (Ha) - Energy of HOMO
+        m._props["epsilon_LUMO"] = float(props[7].replace("*^", "E")) # epsilon_LUMO (Ha) - Energy of LUMO
+        m._props["epsilon_gap"] = float(props[8].replace("*^", "E")) # epsilon_gap (Ha) - Energy gap
+        m._props["R2"] = float(props[9].replace("*^", "E")) # R^2 (a_0^2) - Electronic spatial extent
+        m._props["zpve"] = float(props[10].replace("*^", "E")) # zpve (Ha) - Zero point vibrational energy
+        m._props["U_0"] = float(props[11].replace("*^", "E")) # U_0 (Ha) - Internal energy at 0K
+        m._props["U"] = float(props[12].replace("*^", "E")) # U (Ha) - Internal energy at 298.15K
+        m._props["H"] = float(props[13].replace("*^", "E")) # H (Ha) - Enthalpy at 298.15K
+        m._props["G"] = float(props[14].replace("*^", "E")) # G (Ha) - Free energy at 298.15K
+        m._props["C_v"] = float(props[15].replace("*^", "E")) # C_v (cal/molK) - Heat capacity at 298.15K
 
         m._atoms = []
         for i in range(2, m._n_a+2):
             xyz_props = lines[i].split("\t")
             element = xyz_props[0] # element symbol
-            x = float(xyz_props[1]) # x (angstrom) - X coordinate
-            y = float(xyz_props[2]) # y (angstrom) - Y coordinate
-            z = float(xyz_props[3]) # z (angstrom) - Z coordinate
-            Z_part = float(xyz_props[4]) # Z_part (e) - Mulliken partial charge 
-            m._atoms.push(PositionedAtom(element, x, y, z, Z_part))
+            x = float(xyz_props[1].replace("*^", "E")) # x (angstrom) - X coordinate
+            y = float(xyz_props[2].replace("*^", "E")) # y (angstrom) - Y coordinate
+            z = float(xyz_props[3].replace("*^", "E")) # z (angstrom) - Z coordinate
+            Z_part = float(xyz_props[4].replace("*^", "E")) # Z_part (e) - Mulliken partial charge 
+            m._atoms.append(PositionedAtom(element, x, y, z, Z_part))
 
         freq_props = lines[m._n_a+2].split("\t")
-        m._freqs = [float(freq_prop) for freq_prop in freq_props]
+        m._freqs = [float(freq_prop.replace("*^", "E")) for freq_prop in freq_props]
         m._SMILES = lines[m._n_a+3]
 
         return m
