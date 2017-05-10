@@ -6,6 +6,7 @@ import model
 import fol.rep as fol
 import data
 
+
 class TestFOLModel(unittest.TestCase):
 
     def _print_table(self, hist, name):
@@ -14,7 +15,7 @@ class TestFOLModel(unittest.TestCase):
             print "(" + str(hist["iters"][i]) + ", " + str(hist[name][i]) + ")"
         print "\n"
 
-    def test_model(self):
+    def _test_model(self, model_type):
         print "Starting test..."
         data_size = 3000
         properties_n = 5
@@ -60,14 +61,14 @@ class TestFOLModel(unittest.TestCase):
 
             w.append(.1*2.0**i)
         
-        model_true = model.LogLinearModel(F=F_relevant, w=np.array(w))
-        label_fn = lambda d : model_true.classify(d)
+        model_true = model.PredictionModel.make(model_type, F=F_relevant, w=np.array(w))
+        label_fn = lambda d : model_true.predict(d)
         D = fol.DataSet.make_random(data_size, domain, properties, [], label_fn, seed=1)
 
-        modell1 = model.LogLinearModel()
+        modell1 = model.PredictionModel.make(model_type)
         l1_hist = modell1.train_l1(D, F_full, iterations=140001, C=16.0, eta_0=1.0, alpha=0.8)
 
-        modell1_g = model.LogLinearModel()
+        modell1_g = model.PredictionModel.make(model_type)
         l1_g_hist = modell1_g.train_l1_g(D, F_0, R, t=0.04, iterations=140001, C=8.0, eta_0=1.0, alpha=0.8)
 
 
@@ -89,6 +90,14 @@ class TestFOLModel(unittest.TestCase):
         self._print_table(l1_g_hist, "lls")
         self._print_table(l1_g_hist, "l1s")
         self._print_table(l1_g_hist, "nzs")
+
+    def test_linear(self):
+        print "Linear model..."
+        self._test_model(model.ModelType.LINEAR)
+
+    def test_log_linear(self):
+        print "Log-linear model..."
+        self._test_model(model.ModelType.LOG_LINEAR)
 
 
 if __name__ == '__main__':

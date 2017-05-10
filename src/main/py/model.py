@@ -2,11 +2,31 @@ import numpy as np
 import random
 import fol
 import data
+import abc
 
-class LogLinearModel:
+class ModelType:
+    LINEAR = 0
+    LOG_LINEAR = 1
+
+
+class PredictionModel(object):
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self, w=None, F=None):
         self._w = w
         self._F = F
+
+    @abc.abstractmethod
+    def _gradient_i(self, M, i, w):
+        """ Computes gradient on example i in M at w """
+
+    @abc.abstractmethod
+    def _loss_i(self, M, i, w):
+        """ Computes loss on example M at w """
+
+    @abc.abstractmethod
+    def predict(self, datum, rand=True):
+        """ Makes a prediction for a given datum """
 
     def __str__(self):
         s = ""
@@ -14,28 +34,10 @@ class LogLinearModel:
             s += str(self._F.get_feature_token(i)) + "\t" + str(self._w[i]) + "\n"
         return s
 
-    def _p(self, w, X):
-        f = np.dot(w, X)
-        return np.exp(f)/(1.0+np.exp(f))
-
-
-    def p(self, datum):
-        return self._p(self._w, self._F.compute(datum))
-
-    def classify(self, datum):
-        p = self.p(datum)
-        #if p > 0.5:
-        #    return 1.0
-        #else:
-        #    return 0.0
-        r = random.random()
-        if r < p:
-            return 1.0
-        else:
-            return 0.0
 
     def _eta(self, k, eta_0, alpha, N):
         return eta_0*(alpha**(k/(1.0*N)))
+
 
     def _apply_penalty_l1(self, i, w, u, q):
         z = w[i]
@@ -47,74 +49,11 @@ class LogLinearModel:
 
 
     def _update_weights_l1(self, M, j, eta, w, u, q):
-        l = M.get_data().get(j).get_label()
-        X = M.get_matrix()[j]
-        g = X*(l-self._p(w,X))
-        #print str(X[len(X)-3]) + " " + str(l)
-        for i in range(len(M.get_matrix()[0])): 
+        g = self._gradient(M, j, w)
+        for i in range(len(M.get_matrix()[0])):
             w[i] = w[i] + eta*g[i]
             if not isinstance(M.get_feature_set().get_feature_token(i), fol.FeatureTokenTop):
                 self._apply_penalty_l1(i, w, u, q)
-
-    def _ll_l1(self, M, w, C):
-        ll = 0.0
-        for i in range(M.get_data().get_size()):
-            l = M.get_data().get(i).get_label()
-            X = M.get_matrix()[i]
-            p = self._p(w,X)
-            ll += l*np.log(p)+(1.0-l)*(np.log(1.0-p)) 
-        
-        l1 = 0.0
-        nz = 0
-        for i in range(len(w)):
-            if not isinstance(M.get_feature_set().get_feature_token(i), fol.FeatureTokenTop):
-                if abs(w[i]) > 0:
-                    nz += 1
-                l1 += abs(w[i])
-                ll -= C*abs(w[i])
-
-        return ll, l1, nz
-
-    # See http://aclweb.org/anthology/P/P09/P09-1054.pdf
-    def train_l1(self, D, F, iterations=100, C=0.001, eta_0=1.0, alpha=0.8):
-        D = D.copy()
-        F = F.copy()
-        M = data.DataFeatureMatrix(D, F)
-        u = 0
-        w = np.zeros(F.get_size())
-        q = np.zeros(F.get_size())
-        N = D.get_size()
-        iters = []
-        lls = []
-        l1s = []
-        nzs = []
-        for k in range(iterations):
-            eta = self._eta(k, eta_0, alpha, N)
-            if k % N == 0:
-                M.shuffle()
-                ll, l1, nz = self._ll_l1(M,w,C)
-                
-                iters.append(k)
-                lls.append(ll)
-                l1s.append(l1)
-                nzs.append(nz)
-                
-                print "Training l1 model iteration " + str(k) + " eta: " + str(eta) + " ll: " + str(ll) + " l1: " + str(l1) + " nz: " + str(nz)
-
-            u += eta*C/N
-            j = k % N
-            self._update_weights_l1(M, j, eta, w, u, q)
-
-        self._w = w
-        self._F = F
-
-        ret_history = dict()
-        ret_history["iters"] = iters
-        ret_history["lls"] = lls
-        ret_history["l1s"] = l1s
-        ret_history["nzs"] = nzs        
-
-        return ret_history
 
 
     def _extend_model_g(self, M, R, t, w, q):
@@ -137,6 +76,65 @@ class LogLinearModel:
         return w, q
 
 
+    def _loss_l1(self, M, w, C):
+        ll = 0.0
+        for i in range(M.get_data().get_size()):
+            ll += self._loss_i(M, i, w)
+
+        l1 = 0.0
+        nz = 0
+        for i in range(len(w)):
+            if not isinstance(M.get_feature_set().get_feature_token(i), fol.FeatureTokenTop):
+                if abs(w[i]) > 0:
+                    nz += 1
+                l1 += abs(w[i])
+                ll += C*abs(w[i])
+
+        return ll, l1, nz
+
+
+    # See http://aclweb.org/anthology/P/P09/P09-1054.pdf
+    def train_l1(self, D, F, iterations=100, C=0.001, eta_0=1.0, alpha=0.8):
+        D = D.copy()
+        F = F.copy()
+        M = data.DataFeatureMatrix(D, F)
+        u = 0
+        w = np.zeros(F.get_size())
+        q = np.zeros(F.get_size())
+        N = D.get_size()
+        iters = []
+        lls = []
+        l1s = []
+        nzs = []
+        for k in range(iterations):
+            eta = self._eta(k, eta_0, alpha, N)
+            if k % N == 0:
+                M.shuffle()
+                loss, l1, nz = self._loss_l1(M,w,C)
+
+                iters.append(k)
+                losses.append(loss)
+                l1s.append(l1)
+                nzs.append(nz)
+
+                print "Training l1 model iteration " + str(k) + " eta: " + str(eta) + " loss: " + str(loss) + " l1: " + str(l1) + " nz: " + str(nz)
+
+            u += eta*C/N
+            j = k % N
+            self._update_weights_l1(M, j, eta, w, u, q)
+
+        self._w = w
+        self._F = F
+
+        ret_history = dict()
+        ret_history["iters"] = iters
+        ret_history["losses"] = losses
+        ret_history["l1s"] = l1s
+        ret_history["nzs"] = nzs
+
+        return ret_history
+
+
     def train_l1_g(self, D, F, R, t=0.0, iterations=100, C=0.001, eta_0=1.0, alpha=0.8):
         D = D.copy()
         F = F.copy()
@@ -155,15 +153,15 @@ class LogLinearModel:
             eta = self._eta(k, eta_0, alpha, N)
             if k % N == 0:
                 M.shuffle()
-                ll, l1, nz = self._ll_l1(M,w,C)
-                
+                loss, l1, nz = self._loss_l1(M,w,C)
+
                 iters.append(k)
-                lls.append(ll)
+                losses.append(loss)
                 l1s.append(l1)
                 nzs.append(nz)
 
                 w, q = self._extend_model_g(M, R, t, w, q)
-                print "Training l1-g model iteration " + str(k) + " eta: " + str(eta) + " ll: " + str(ll) + " l1: " + str(l1) + " nz: " + str(nz)
+                print "Training l1-g model iteration " + str(k) + " eta: " + str(eta) + " loss: " + str(loss) + " l1: " + str(l1) + " nz: " + str(nz)
 
             u += eta*C/N
 
@@ -175,9 +173,82 @@ class LogLinearModel:
 
         ret_history = dict()
         ret_history["iters"] = iters
-        ret_history["lls"] = lls
+        ret_history["losses"] = losses
         ret_history["l1s"] = l1s
         ret_history["nzs"] = nzs
 
         return ret_history
 
+    @staticmethod
+    def make(model_type, w=None, F=None):
+        if model_type == ModelType.LINEAR:
+            return LinearModel(w, F)
+        else:
+            return LogLinearModel(w, F)
+
+
+class LogLinearModel(PredictionModel):
+    def __init__(self, w=None, F=None):
+        PredictionModel.__init__(self, w, F)
+
+    def _p(self, w, X):
+        f = np.dot(w, X)
+        return np.exp(f)/(1.0+np.exp(f))
+
+    def p(self, datum):
+        return self._p(self._w, self._F.compute(datum))
+
+    def _gradient_i(self, M, i, w):
+        l = M.get_data().get(i).get_label()
+        X = M.get_matrix()[i]
+        return X*(l-self._p(w,X))
+
+    def _loss_i(self, M, i):
+        l = M.get_data().get(i).get_label()
+        X = M.get_matrix()[i]
+        p = self._p(w,X)
+        return -l*np.log(p)-(1.0-l)*(np.log(1.0-p))
+
+    def predict(self, datum, rand=True):
+        p = self.p(datum)
+        if not rand:
+            if p > 0.5:
+                return 1.0
+            else:
+                return 0.0
+        else:
+            r = random.random()
+            if r < p:
+                return 1.0
+            else:
+                return 0.0
+
+
+class LinearModel(PredictionModel):
+    def __init__(self, w=None, F=None):
+        PredictionModel.__init__(self, w, F)
+
+    def _mu(self, w, X):
+        return np.dot(w, X)
+
+    def mu(self, datum):
+        return self._mu(self._w, self._F.compute(datum))
+
+    def _gradient_i(self, M, i, w):
+        l = M.get_data().get(i).get_label()
+        X = M.get_matrix()[i]
+        return X*(self._mu(w,X)-l)
+
+    def _loss_i(self, M, i):
+        l = M.get_data().get(i).get_label()
+        X = M.get_matrix()[i]
+        p = self._p(w,X)
+        error = self._mu(w,X)-l
+        return 0.5 * (error**2)
+
+    def predict(self, datum, rand=True):
+        mu = self.mu(datum)
+        if not rand:
+            return mu
+        else:
+            return np.random.normal(mu, 1.0)
