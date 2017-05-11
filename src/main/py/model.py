@@ -1,6 +1,6 @@
 import numpy as np
 import random
-import fol
+import fol.rep as fol
 import data
 import abc
 
@@ -49,7 +49,7 @@ class PredictionModel(object):
 
 
     def _update_weights_l1(self, M, j, eta, w, u, q):
-        g = self._gradient(M, j, w)
+        g = self._gradient_i(M, j, w)
         for i in range(len(M.get_matrix()[0])):
             w[i] = w[i] + eta*g[i]
             if not isinstance(M.get_feature_set().get_feature_token(i), fol.FeatureTokenTop):
@@ -77,9 +77,9 @@ class PredictionModel(object):
 
 
     def _loss_l1(self, M, w, C):
-        ll = 0.0
+        loss = 0.0
         for i in range(M.get_data().get_size()):
-            ll += self._loss_i(M, i, w)
+            loss += self._loss_i(M, i, w)
 
         l1 = 0.0
         nz = 0
@@ -88,9 +88,9 @@ class PredictionModel(object):
                 if abs(w[i]) > 0:
                     nz += 1
                 l1 += abs(w[i])
-                ll += C*abs(w[i])
+                loss += C*abs(w[i])
 
-        return ll, l1, nz
+        return loss, l1, nz
 
 
     # See http://aclweb.org/anthology/P/P09/P09-1054.pdf
@@ -103,7 +103,7 @@ class PredictionModel(object):
         q = np.zeros(F.get_size())
         N = D.get_size()
         iters = []
-        lls = []
+        losses = []
         l1s = []
         nzs = []
         for k in range(iterations):
@@ -145,7 +145,7 @@ class PredictionModel(object):
         N = D.get_size()
 
         iters = []
-        lls = []
+        losses = []
         l1s = []
         nzs = []
 
@@ -203,7 +203,7 @@ class LogLinearModel(PredictionModel):
         X = M.get_matrix()[i]
         return X*(l-self._p(w,X))
 
-    def _loss_i(self, M, i):
+    def _loss_i(self, M, i, w):
         l = M.get_data().get(i).get_label()
         X = M.get_matrix()[i]
         p = self._p(w,X)
@@ -237,12 +237,17 @@ class LinearModel(PredictionModel):
     def _gradient_i(self, M, i, w):
         l = M.get_data().get(i).get_label()
         X = M.get_matrix()[i]
-        return X*(self._mu(w,X)-l)
+        #print X
+        #print w
+        #print self._mu(w,X)
+        #print l
+        #print l
 
-    def _loss_i(self, M, i):
+        return X*(l-self._mu(w,X))
+
+    def _loss_i(self, M, i, w):
         l = M.get_data().get(i).get_label()
         X = M.get_matrix()[i]
-        p = self._p(w,X)
         error = self._mu(w,X)-l
         return 0.5 * (error**2)
 

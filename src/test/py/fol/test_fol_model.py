@@ -15,7 +15,7 @@ class TestFOLModel(unittest.TestCase):
             print "(" + str(hist["iters"][i]) + ", " + str(hist[name][i]) + ")"
         print "\n"
 
-    def _test_model(self, model_type):
+    def _test_model(self, model_type, eta_0):
         print "Starting test..."
         data_size = 3000
         properties_n = 5
@@ -66,10 +66,10 @@ class TestFOLModel(unittest.TestCase):
         D = fol.DataSet.make_random(data_size, domain, properties, [], label_fn, seed=1)
 
         modell1 = model.PredictionModel.make(model_type)
-        l1_hist = modell1.train_l1(D, F_full, iterations=140001, C=16.0, eta_0=1.0, alpha=0.8)
+        l1_hist = modell1.train_l1(D, F_full, iterations=140001, C=16.0, eta_0=eta_0, alpha=0.8)
 
         modell1_g = model.PredictionModel.make(model_type)
-        l1_g_hist = modell1_g.train_l1_g(D, F_0, R, t=0.04, iterations=140001, C=8.0, eta_0=1.0, alpha=0.8)
+        l1_g_hist = modell1_g.train_l1_g(D, F_0, R, t=0.04, iterations=140001, C=8.0, eta_0=eta_0, alpha=0.8)
 
 
         print "True model"
@@ -82,22 +82,22 @@ class TestFOLModel(unittest.TestCase):
         print str(modell1_g)
 
         print "l1 histories"
-        self._print_table(l1_hist, "lls")
+        self._print_table(l1_hist, "losses")
         self._print_table(l1_hist, "l1s")
         self._print_table(l1_hist, "nzs")
 
         print "l1-g histories"
-        self._print_table(l1_g_hist, "lls")
+        self._print_table(l1_g_hist, "losses")
         self._print_table(l1_g_hist, "l1s")
         self._print_table(l1_g_hist, "nzs")
 
     def test_linear(self):
         print "Linear model..."
-        self._test_model(model.ModelType.LINEAR)
+        self._test_model(model.ModelType.LINEAR, 0.1)
 
     def test_log_linear(self):
         print "Log-linear model..."
-        self._test_model(model.ModelType.LOG_LINEAR)
+        self._test_model(model.ModelType.LOG_LINEAR, 1.0)
 
 
 if __name__ == '__main__':
