@@ -1,10 +1,10 @@
 #!/bin/bash
 
+DATA_PATH=<PATH_TO DATA DIRECTORY>
 TEST_DIR=src/test/py/fol
-PWD=`pwd` 
+PWD=`pwd`
 export PYTHONPATH=$PYTHONPATH:${PWD}/src/main/py/
 export PROVER9=<PATH TO PROVER BINARY>
 
-python ${TEST_DIR}/test_fol_data.py
-python ${TEST_DIR}/test_fol_rules.py
-python ${TEST_DIR}/test_fol_model.py
+python test_chem_data.py $DATA_PATH
+
