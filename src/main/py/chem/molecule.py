@@ -1,3 +1,35 @@
+from rdkit import Chem
+import fol.rep as fol
+
+# Energies of atoms for computing atomization energies for molecules
+#=========================================================================================================
+#  Ele-    ZPVE         U (0 K)      U (298.15 K)    H (298.15 K)    G (298.15 K)     CV
+#  ment   Hartree       Hartree        Hartree         Hartree         Hartree        Cal/(Mol Kelvin)
+#=========================================================================================================
+#   H     0.000000     -0.500273      -0.498857       -0.497912       -0.510927       2.981
+#   C     0.000000    -37.846772     -37.845355      -37.844411      -37.861317       2.981
+#   N     0.000000    -54.583861     -54.582445      -54.581501      -54.598897       2.981
+#   O     0.000000    -75.064579     -75.063163      -75.062219      -75.079532       2.981
+#   F     0.000000    -99.718730     -99.717314      -99.716370      -99.733544       2.981
+#=========================================================================================================
+U_0_H = -0.500273
+U_0_C = -37.846772
+U_0_N = -54.583861
+U_0_O = -75.064579
+U_0_F = -99.718730
+
+# Properties (unary) and relations (binary) for FOL relational structures
+ATOMIC_PROPERTIES = ["H", "C", "N", "O", "F"]
+ATOMIC_RELATIONS = Chem.rdchem.BondType.names.keys()
+
+ATOMIC_PROPERTY_INDICES = dict()
+ATOMIC_RELATION_INDICES = dict()
+for i in range(len(ATOMIC_PROPERTIES)):
+    ATOMIC_PROPERTY_INDICES[ATOMIC_PROPERTIES[i]] = i
+for i in range(len(ATOMIC_RELATIONS)):
+    ATOMIC_RELATION_INDICES[ATOMIC_RELATIONS[i]] = i 
+
+
 class PositionedAtom:
     def __init__(self, element, x, y, z, Z_part):
         self._element = element
@@ -35,6 +67,20 @@ class PositionedAtom:
         else:
             return None
 
+    def get_U_0(self):
+        if self._element == "C":
+            return U_0_C
+        elif self._element == "H":
+            return U_0_H
+        elif self._element == "O":
+            return U_0_O
+        elif self._element == "N":
+            return U_0_N
+        elif self._element == "F":
+            return U_0_F
+        else:
+            return None
+
 
 class Molecule:
     def __init__(self):
@@ -60,6 +106,9 @@ class Molecule:
 
     def get_SMILES(self):
         return self._SMILES
+
+    def get_model(self):
+        return self._model
 
     @staticmethod
     def from_xyz(xyz):
@@ -88,7 +137,8 @@ class Molecule:
         m._props["H"] = float(props[13].replace("*^", "E")) # H (Ha) - Enthalpy at 298.15K
         m._props["G"] = float(props[14].replace("*^", "E")) # G (Ha) - Free energy at 298.15K
         m._props["C_v"] = float(props[15].replace("*^", "E")) # C_v (cal/molK) - Heat capacity at 298.15K
-
+        m._props["E_atomization"] = m._props["U_0"]
+        
         m._atoms = []
         for i in range(2, m._n_a+2):
             xyz_props = lines[i].split("\t")
@@ -97,11 +147,52 @@ class Molecule:
             y = float(xyz_props[2].replace("*^", "E")) # y (angstrom) - Y coordinate
             z = float(xyz_props[3].replace("*^", "E")) # z (angstrom) - Z coordinate
             Z_part = float(xyz_props[4].replace("*^", "E")) # Z_part (e) - Mulliken partial charge 
-            m._atoms.append(PositionedAtom(element, x, y, z, Z_part))
+            
+            atom = PositionedAtom(element, x, y, z, Z_part)
+            m._props["E_atomization"] -= atom.get_U_0()
+
+            m._atoms.append(atom)
 
         freq_props = lines[m._n_a+2].split("\t")
         m._freqs = [float(freq_prop.replace("*^", "E")) for freq_prop in freq_props]
-        m._SMILES = lines[m._n_a+3]
+        
+        SMILES = lines[m._n_a+3].strip().split("\t")
+        m._SMILES = SMILES[len(SMILES)-1]
+
+        # RDKit model
+        m_rd = Chem.AddHs(Chem.MolFromSmiles(m._SMILES))
+        
+        #### FOL Relational structure ####
+        domain = [str(i) for i in range(m_rd.GetNumAtoms())]
+        properties = ATOMIC_PROPERTIES
+        binary_rels = ATOMIC_RELATIONS
+        
+        property_sets = [set([]) for i in range(len(properties))]
+        binary_rel_sets = [set([]) for i in range(len(binary_rels))]
+
+        v = []
+        for i in range(len(domain)):
+            v.append((domain[i], domain[i]))
+            element_i = m._atoms[i].get_element()
+            element_property_index = ATOMIC_PROPERTY_INDICES[element_i]
+            property_sets[element_property_index].add(domain[i])
+
+        for i in range(m_rd.GetNumBonds()):
+            bond_i = m_rd.GetBondWithIdx(i)
+            bond_type = str(bond_i.GetBondType())
+            begin_atom = str(bond_i.GetBeginAtomIdx())
+            end_atom = str(bond_i.GetEndAtomIdx())
+            bond_property_index = ATOMIC_RELATION_INDICES[bond_type]
+            binary_rel_sets[bond_property_index].add((begin_atom, end_atom))
+
+        for i in range(len(property_sets)):
+            v.append((properties[i], property_sets[i]))
+
+        for i in range(len(binary_rel_sets)):
+            v.append((binary_rels[i], binary_rel_sets[i]))
+
+        m._model = fol.RelationalModel(domain, properties, binary_rels, v)
+        #### END FOL ####
 
         return m
 

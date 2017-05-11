@@ -4,12 +4,18 @@ import nltk
 from nltk.sem.logic import *
 import copy
 
-class RandomModel:
-    def __init__(self, domain, properties, binary_rels):
+class RelationalModel:
+    def __init__(self, domain, properties, binary_rels, valuation):
         self._domain = domain
         self._properties = properties
         self._binary_rels = binary_rels
+        self._model = nltk.Model(set(domain), nltk.Valuation(valuation))
 
+    def evaluate(self, form, g):
+        return self._model.evaluate(form, g)
+
+    @staticmethod
+    def make_random(domain, properties, binary_rels):
         property_sets = [set([]) for i in range(len(properties))]
         binary_rel_sets = [set([]) for i in range(len(binary_rels))]
 
@@ -23,7 +29,8 @@ class RandomModel:
             
             for j in range(len(binary_rels)):
                 for k in range(len(domain)):
-                    binary_rel_sets[j].add((domain[i], domain[k]))
+                    if random.randint(0,1) == 1:
+                        binary_rel_sets[j].add((domain[i], domain[k]))
 
         for i in range(len(property_sets)):
             v.append((properties[i], property_sets[i]))
@@ -31,11 +38,8 @@ class RandomModel:
         for i in range(len(binary_rel_sets)):
             v.append((binary_rels[i], binary_rel_sets[i]))
 
-        val = nltk.Valuation(v)
-        self._model = nltk.Model(set(domain), val)
+        return RelationalModel(domain, properties, binary_rels, v)
 
-    def evaluate(self, form, g):
-        return self._model.evaluate(form, g)
 
 class Datum:
     def __init__(self, model):
@@ -49,7 +53,7 @@ class Datum:
 
     @staticmethod
     def make_random(domain, properties, binary_rels, label_fn):
-        m = RandomModel(domain, properties, binary_rels)
+        m = RelationalModel.make_random(domain, properties, binary_rels)
         d = Datum(m)
         d._label = label_fn(d)
         return d
