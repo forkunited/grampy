@@ -1,9 +1,10 @@
 import data
 import molecule
+import fol.rep as fol
 from os import listdir
 from os.path import isfile, join
 
-class Datum:
+class Datum(fol.Datum):
     def __init__(self, molecule, value):
         self._molecule = molecule
         self._value = value
@@ -14,14 +15,16 @@ class Datum:
     def get_molecule(self):
         return self._molecule
 
+    def get_model(self):
+        return self._molecule.get_model()
 
-class DataSet(data.DataSet):
+class DataSet(fol.DataSet):
     def __init__(self):
         data.DataSet.__init__(self)
 
     @staticmethod
     def make_from_xyz_dir(dir_path, value_property):
-        xyz_files = [join(dir_path, f) for f in listdir(dir_path) if isfile(join(dir_path, f))]
+        xyz_files = sorted([join(dir_path, f) for f in listdir(dir_path) if isfile(join(dir_path, f))])
         D = DataSet()
         for xyz_file in xyz_files:
             m = molecule.Molecule.from_xyz_file(xyz_file)

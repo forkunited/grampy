@@ -14,7 +14,7 @@ class TestFOLData(unittest.TestCase):
         form = fol.OpenFormula(domain, "P0(x)", ["x"])
         feature = fol.FeatureType(form)
         label_fn = lambda d : feature.compute(d)[test_f]
-        d = fol.DataSet.make_random(size, domain, properties, binary_rels, label_fn, seed=1)
+        d = fol.DataSet.make_random(size, domain, properties, binary_rels, label_fn)
 
         for i in range(size):
             f = d.get_data()[i].get_model().evaluate(form.get_form(), feature.get_token(test_f).get_closed_form().get_g())

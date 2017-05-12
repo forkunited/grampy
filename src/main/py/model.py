@@ -94,7 +94,7 @@ class PredictionModel(object):
 
 
     # See http://aclweb.org/anthology/P/P09/P09-1054.pdf
-    def train_l1(self, D, F, iterations=100, C=0.001, eta_0=1.0, alpha=0.8):
+    def train_l1(self, D, F, iterations=100, C=0.001, eta_0=1.0, alpha=0.8, evaluation_fn=None):
         D = D.copy()
         F = F.copy()
         M = data.DataFeatureMatrix(D, F)
@@ -106,18 +106,30 @@ class PredictionModel(object):
         losses = []
         l1s = []
         nzs = []
+        vals = []
         for k in range(iterations):
             eta = self._eta(k, eta_0, alpha, N)
             if k % N == 0:
                 M.shuffle()
+                
+                self._w = w
+                self._F = F
+
                 loss, l1, nz = self._loss_l1(M,w,C)
+                val = None
+                if evaluation_fn is not None:
+                    val = evaluation_fn(self)
+                    vals.append(val)
 
                 iters.append(k)
                 losses.append(loss)
                 l1s.append(l1)
                 nzs.append(nz)
 
-                print "Training l1 model iteration " + str(k) + " eta: " + str(eta) + " loss: " + str(loss) + " l1: " + str(l1) + " nz: " + str(nz)
+                iter_str = "Training l1 model iteration " + str(k) + " eta: " + str(eta) + " loss: " + str(loss) + " l1: " + str(l1) + " nz: " + str(nz)
+                if val is not None:
+                    iter_str += " eval: " + str(val)
+                print iter_str
 
             u += eta*C/N
             j = k % N
@@ -132,10 +144,13 @@ class PredictionModel(object):
         ret_history["l1s"] = l1s
         ret_history["nzs"] = nzs
 
+        if len(vals) > 0:
+            ret_history["vals"] = vals
+
         return ret_history
 
 
-    def train_l1_g(self, D, F, R, t=0.0, iterations=100, C=0.001, eta_0=1.0, alpha=0.8):
+    def train_l1_g(self, D, F, R, t=0.0, iterations=100, C=0.001, eta_0=1.0, alpha=0.8, evaluation_fn=None):
         D = D.copy()
         F = F.copy()
         M = data.DataFeatureMatrix(D, F)
@@ -148,12 +163,21 @@ class PredictionModel(object):
         losses = []
         l1s = []
         nzs = []
+        vals = []
 
         for k in range(iterations):
             eta = self._eta(k, eta_0, alpha, N)
             if k % N == 0:
                 M.shuffle()
+
+                self._w = w
+                self._F = F
+
                 loss, l1, nz = self._loss_l1(M,w,C)
+                val = None
+                if evaluation_fn is not None:
+                    val = evaluation_fn(self)
+                    vals.append(val)
 
                 iters.append(k)
                 losses.append(loss)
@@ -161,7 +185,11 @@ class PredictionModel(object):
                 nzs.append(nz)
 
                 w, q = self._extend_model_g(M, R, t, w, q)
-                print "Training l1-g model iteration " + str(k) + " eta: " + str(eta) + " loss: " + str(loss) + " l1: " + str(l1) + " nz: " + str(nz)
+                iter_str = "Training l1-g model iteration " + str(k) + " eta: " + str(eta) + " loss: " + str(loss) + " l1: " + str(l1) + " nz: " + str(nz)
+                if val is not None:
+                    iter_str += " eval: " + str(val)
+
+                print iter_str
 
             u += eta*C/N
 
@@ -176,6 +204,9 @@ class PredictionModel(object):
         ret_history["losses"] = losses
         ret_history["l1s"] = l1s
         ret_history["nzs"] = nzs
+
+        if len(vals) > 0:
+            ret_history["vals"] = vals
 
         return ret_history
 

@@ -1,6 +1,7 @@
 import data
 import random
 import nltk
+import numpy as np
 from nltk.sem.logic import *
 import copy
 
@@ -24,12 +25,12 @@ class RelationalModel:
             v.append((domain[i], domain[i])) 
             
             for j in range(len(properties)):
-                if random.randint(0,1) == 1:
+                if np.random.randint(2) == 1:
                     property_sets[j].add(domain[i])
             
             for j in range(len(binary_rels)):
                 for k in range(len(domain)):
-                    if random.randint(0,1) == 1:
+                    if np.random.randint(2) == 1:
                         binary_rel_sets[j].add((domain[i], domain[k]))
 
         for i in range(len(property_sets)):
@@ -64,8 +65,7 @@ class DataSet(data.DataSet):
         data.DataSet.__init__(self)
 
     @staticmethod
-    def make_random(size, domain, properties, binary_rels, label_fn, seed=1):
-        random.seed(seed)
+    def make_random(size, domain, properties, binary_rels, label_fn):
         D = DataSet()
         for i in range(0, size):
             D._data.append(Datum.make_random(domain, properties, binary_rels, label_fn))
