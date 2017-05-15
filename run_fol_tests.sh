@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TEST_DIR=src/test/py/fol
+TEST_DIR=src/test/py/gram/fol
 PWD=`pwd` 
 export PYTHONPATH=$PYTHONPATH:${PWD}/src/main/py/
 export PROVER9=<PATH TO PROVER BINARY>

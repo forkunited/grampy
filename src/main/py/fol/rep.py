@@ -1,4 +1,4 @@
-import data
+from py import data
 import random
 import nltk
 import numpy as np

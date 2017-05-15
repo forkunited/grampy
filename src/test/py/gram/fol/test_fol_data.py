@@ -1,6 +1,6 @@
 import unittest
-import data
-import fol.rep as fol
+import gram.data as data
+import gram.fol.rep as fol
 
 class TestFOLData(unittest.TestCase):
 
