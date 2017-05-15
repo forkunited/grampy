@@ -1,6 +1,5 @@
 import unittest
-import data
-import chem.rep as chem
+import gram.chem.data as data
 import sys
 
 DATA_DIR = sys.argv[1]
@@ -9,7 +8,7 @@ del sys.argv[1] # Necessary to allow unittest.main() to work
 
 class TestChemData(unittest.TestCase):
     def test_random(self):
-        D = chem.DataSet.make_from_xyz_dir(DATA_DIR, "H") # H is enthalpy
+        D = data.DataSet.make_from_xyz_dir(DATA_DIR, "H") # H is enthalpy
         for i in range(D.get_size()):
             datum = D.get(i)
             self.assertEqual(datum.get_molecule().get_property("H"), datum.get_value())

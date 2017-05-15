@@ -1,6 +1,11 @@
 import unittest
-import data
-import fol.rep as fol
+import gram.rule as rule
+import gram.data as data
+import gram.feature as feat
+import gram.fol.rep as fol
+from gram.fol.rule_form_indicator import BinaryRule
+from gram.fol.rule_form_indicator import UnaryRule
+from gram.fol.feature_form_indicator import FeatureFormIndicatorType
 import nltk
 
 class TestFOLRules(unittest.TestCase):
@@ -10,21 +15,21 @@ class TestFOLRules(unittest.TestCase):
         properties = ["P0", "P1", "P2", "P3"]
         binary_rels = ["R0", "R1", "R2", "R3"]
 
-        F = data.FeatureSet()
+        F = feat.FeatureSet()
 
         form0 = fol.OpenFormula(domain, "P0(x)", ["x"])
-        feature0 = fol.FeatureType(form0)
+        feature0 = FeatureFormIndicatorType(form0)
         F.add_feature_type(feature0)        
 
         form1 = fol.OpenFormula(domain, "P1(x)", ["x"])
-        feature1 = fol.FeatureType(form1)
+        feature1 = FeatureFormIndicatorType(form1)
         F.add_feature_type(feature1)
 
         form2 = fol.OpenFormula(domain, "P2(x)", ["x"])
-        feature2 = fol.FeatureType(form2)
+        feature2 = FeatureFormIndicatorType(form2)
         #F.add_feature_type(feature2)
 
-        rs = data.RuleSet()
+        rs = rule.RuleSet()
 
         # Binary rule conjunction
         def conj_fn(cf1, cf2): 
@@ -32,7 +37,7 @@ class TestFOLRules(unittest.TestCase):
             new_g = cf2_o.get_g().copy()
             new_g.update(cf1.get_g())
             return [fol.OpenFormula(domain, str(cf1.get_exp() & cf2_o.get_exp()), new_g.keys(), init_g=new_g)]
-        rConj = fol.BinaryRule(None, None, conj_fn)
+        rConj = BinaryRule(None, None, conj_fn)
         rs.add_binary_rule(rConj)
 
         # Test conjunction
@@ -50,7 +55,7 @@ class TestFOLRules(unittest.TestCase):
             new_g.update(cf1.get_g())
             return [fol.OpenFormula(domain, str(cf1.get_exp() | cf2_o.get_exp()), new_g.keys(), init_g=new_g)]
         cf0 = fol.ClosedFormula(form0.get_form(), nltk.Assignment(domain, []))
-        rDisj0 = fol.BinaryRule(cf0, cf0, disj_fn)
+        rDisj0 = BinaryRule(cf0, cf0, disj_fn)
         rs.add_binary_rule(rDisj0)
 
         output_forms = rs.apply(F_tokens)
@@ -65,7 +70,7 @@ class TestFOLRules(unittest.TestCase):
                 del new_g[var]
                 ofs.append(fol.OpenFormula(domain, "exists " + var + "." + cf.get_form(), new_g.keys(), init_g=new_g))
             return ofs
-        rExistI = fol.UnaryRule(None, exist_fn)
+        rExistI = UnaryRule(None, exist_fn)
         rs.add_unary_rule(rExistI)
 
         # FIXME Maybe do later: Unary rule remove existential
@@ -76,7 +81,7 @@ class TestFOLRules(unittest.TestCase):
             for var in cf.get_g():
                 ofs.append(fol.OpenFormula(domain, "P2(" + var + ")", [var], init_g=nltk.Assignment(domain,[(var, cf.get_g()[var])])))
             return ofs
-        rP0_2 = fol.UnaryRule(cf0, p_2_fn)
+        rP0_2 = UnaryRule(cf0, p_2_fn)
         rs.add_unary_rule(rP0_2)
 
         output_forms = rs.apply(F_tokens)

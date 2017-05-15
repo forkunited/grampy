@@ -1,6 +1,9 @@
 import unittest
+import gram.feature as feat
 import gram.data as data
 import gram.fol.rep as fol
+import gram.fol.data
+from gram.fol.feature_form_indicator import FeatureFormIndicatorType
 
 class TestFOLData(unittest.TestCase):
 
@@ -12,9 +15,9 @@ class TestFOLData(unittest.TestCase):
         binary_rels = ["R0", "R1", "R2", "R3"]
               
         form = fol.OpenFormula(domain, "P0(x)", ["x"])
-        feature = fol.FeatureType(form)
+        feature = FeatureFormIndicatorType(form)
         label_fn = lambda d : feature.compute(d)[test_f]
-        d = fol.DataSet.make_random(size, domain, properties, binary_rels, label_fn)
+        d = gram.fol.data.DataSet.make_random(size, domain, properties, binary_rels, label_fn)
 
         for i in range(size):
             f = d.get_data()[i].get_model().evaluate(form.get_form(), feature.get_token(test_f).get_closed_form().get_g())
@@ -24,12 +27,12 @@ class TestFOLData(unittest.TestCase):
         self.assertEqual(len(d.get_data()), size)
 
         form1 = fol.OpenFormula(domain, "P1(x)", ["x"])
-        feature1 = fol.FeatureType(form1)
+        feature1 = FeatureFormIndicatorType(form1)
 
-        F = data.FeatureSet()
+        F = feat.FeatureSet()
         F.add_feature_type(feature1)
 
-        fmat = data.DataFeatureMatrix(d, F)
+        fmat = feat.DataFeatureMatrix(d, F)
         fmat.extend([feature])
         mat = fmat.get_matrix()
         for i in range(size):

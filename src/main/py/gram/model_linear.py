@@ -1,8 +1,11 @@
 import numpy as np
 import random
-import fol.rep as fol
+import gram.fol.rep as fol
 import data
+import feature
 import abc
+from gram.fol.feature_top import FeatureTopToken
+
 
 class ModelType:
     LINEAR = 0
@@ -52,7 +55,7 @@ class PredictionModel(object):
         g = self._gradient_i(M, j, w)
         for i in range(len(M.get_matrix()[0])):
             w[i] = w[i] + eta*g[i]
-            if not isinstance(M.get_feature_set().get_feature_token(i), fol.FeatureTokenTop):
+            if not isinstance(M.get_feature_set().get_feature_token(i), FeatureTopToken):
                 self._apply_penalty_l1(i, w, u, q)
 
 
@@ -84,7 +87,7 @@ class PredictionModel(object):
         l1 = 0.0
         nz = 0
         for i in range(len(w)):
-            if not isinstance(M.get_feature_set().get_feature_token(i), fol.FeatureTokenTop):
+            if not isinstance(M.get_feature_set().get_feature_token(i), FeatureTopToken):
                 if abs(w[i]) > 0:
                     nz += 1
                 l1 += abs(w[i])
@@ -97,7 +100,7 @@ class PredictionModel(object):
     def train_l1(self, D, F, iterations=100, C=0.001, eta_0=1.0, alpha=0.8, evaluation_fn=None):
         D = D.copy()
         F = F.copy()
-        M = data.DataFeatureMatrix(D, F)
+        M = feature.DataFeatureMatrix(D, F)
         u = 0
         w = np.zeros(F.get_size())
         q = np.zeros(F.get_size())
@@ -153,7 +156,7 @@ class PredictionModel(object):
     def train_l1_g(self, D, F, R, t=0.0, iterations=100, C=0.001, eta_0=1.0, alpha=0.8, evaluation_fn=None):
         D = D.copy()
         F = F.copy()
-        M = data.DataFeatureMatrix(D, F)
+        M = feature.DataFeatureMatrix(D, F)
         u = 0
         w = np.zeros(F.get_size())
         q = np.zeros(F.get_size())
@@ -268,11 +271,6 @@ class LinearModel(PredictionModel):
     def _gradient_i(self, M, i, w):
         l = M.get_data().get(i).get_label()
         X = M.get_matrix()[i]
-        #print X
-        #print w
-        #print self._mu(w,X)
-        #print l
-        #print l
 
         return X*(l-self._mu(w,X))
 
