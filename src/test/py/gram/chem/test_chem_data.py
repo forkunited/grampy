@@ -1,5 +1,8 @@
 import unittest
-import gram.chem.data as data
+import gram.chem.data as cdata
+import gram.data as data
+import gram.feature as feature
+import gram.chem.feature_atomic_bond as fbond
 import sys
 
 DATA_DIR = sys.argv[1]
@@ -7,43 +10,29 @@ DATA_DIR = sys.argv[1]
 del sys.argv[1] # Necessary to allow unittest.main() to work
 
 class TestChemData(unittest.TestCase):
-    def test_random(self):
-        D = data.DataSet.make_from_xyz_dir(DATA_DIR, "H") # H is enthalpy
+    def test_data_load(self):
+        D = cdata.DataSet.make_from_xyz_dir(DATA_DIR, "H", max_size=10) # H is enthalpy
         for i in range(D.get_size()):
             datum = D.get(i)
             self.assertEqual(datum.get_molecule().get_property("H"), datum.get_value())
 
+    def test_molecule_features(self):
+        D = cdata.DataSet.make_from_xyz_dir(DATA_DIR, "H", max_size=1)
+        atomic_domain = D.get_molecule_domain()
 
-        #test_f = 0
-        #size = 20
-        #domain = ["0", "1", "2", "3"]
-        #properties = ["P0", "P1", "P2", "P3"]
-        #binary_rels = ["R0", "R1", "R2", "R3"]
-              
-        #form = fol.OpenFormula(domain, "P0(x)", ["x"])
-        #feature = fol.FeatureType(form)
-        #label_fn = lambda d : feature.compute(d)[test_f]
-        #d = fol.DataSet.make_random(size, domain, properties, binary_rels, label_fn, seed=1)
+        f = fbond.FeatureAtomicBondType(atomic_domain)
+        F = feature.FeatureSet()
+        F.add_feature_type(f)
+        
+        fmat = feature.DataFeatureMatrix(D, F)
+        mat = fmat.get_matrix()
 
-        #for i in range(size):
-        #    f = d.get_data()[i].get_model().evaluate(form.get_form(), feature.get_token(test_f).get_closed_form().get_g())
-        #    l = d.get_data()[i].get_label()
-        #    self.assertEqual(f, l)
+        print "Molecule bonds"
+        print D.get(0).get_molecule().get_structure_str() 
 
-        #self.assertEqual(len(d.get_data()), size)
-
-        #form1 = fol.OpenFormula(domain, "P1(x)", ["x"])
-        #feature1 = fol.FeatureType(form1)
-
-        #F = data.FeatureSet()
-        #F.add_feature_type(feature1)
-
-        #fmat = data.DataFeatureMatrix(d, F)
-        #fmat.extend([feature])
-        #mat = fmat.get_matrix()
-        #for i in range(size):
-        #    self.assertEqual(mat[i][feature1.get_size() + test_f], d.get_data()[i].get_label())
-
+        print "Features"
+        for i in range(f.get_size()):
+            print str(f.get_token(i)) + ": " + str(mat[0][i])
 
 if __name__ == '__main__':
     unittest.main()

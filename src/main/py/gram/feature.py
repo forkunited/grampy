@@ -57,6 +57,9 @@ class FeatureSet:
                 offset += self._feature_types[i].get_size()
         return None
 
+    def get_feature_type(self, index):
+        return self._feature_types[index]
+
     def copy(self):
         return FeatureSet(feature_types=self._feature_types)
 

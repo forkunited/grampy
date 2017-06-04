@@ -22,15 +22,38 @@ class Datum(gram.fol.data.Datum):
 class DataSet(gram.fol.data.DataSet):
     def __init__(self):
         data.DataSet.__init__(self)
+        self._molecule_domain = ["0"]
+
+    def get_molecule_domain(self):
+        return self._molecule_domain
 
     @staticmethod
-    def make_from_xyz_dir(dir_path, value_property):
-        xyz_files = sorted([join(dir_path, f) for f in listdir(dir_path) if isfile(join(dir_path, f))])
-        D = data.DataSet()
+    def make_from_xyz_dir(dir_path, value_property, max_size=None):
+        xyz_file_names = sorted(listdir(dir_path))
+        xyz_files = []
+        i = 0
+        for f in xyz_file_names:
+            f_path = join(dir_path, f)
+            if not isfile(f_path):
+                continue
+            if i >= max_size:
+                break
+            xyz_files.append(f_path)
+            i += 1
+        
+        D = DataSet()
+        i = 0
         for xyz_file in xyz_files:
+            if max_size is not None and i == max_size:
+                break
             m = chem.Molecule.from_xyz_file(xyz_file)
+
+            if m.get_n_a() > len(D._molecule_domain):
+                D._molecule_domain = [str(i) for i in range(m.get_n_a())]
+
             value = m.get_property(value_property)
             D._data.append(Datum(m, value))
+            i += 1
         return D
 
 

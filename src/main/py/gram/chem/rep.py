@@ -19,8 +19,11 @@ U_0_O = -75.064579
 U_0_F = -99.718730
 
 # Properties (unary) and relations (binary) for FOL relational structures
-ATOMIC_PROPERTIES = ["H", "C", "N", "O", "F"]
+# NOTE: It's necessary that predicate names are greater than one character
+# so that nltk doesn't stupidly treat them as variables... :(
+ATOMIC_PROPERTIES = ["H_e", "C_e", "N_e", "O_e", "F_e"]
 ATOMIC_RELATIONS = Chem.rdchem.BondType.names.keys()
+ATOMIC_RELATIONS_LOADED = set([])
 
 ATOMIC_PROPERTY_INDICES = dict()
 ATOMIC_RELATION_INDICES = dict()
@@ -31,15 +34,19 @@ for i in range(len(ATOMIC_RELATIONS)):
 
 
 class PositionedAtom:
-    def __init__(self, element, x, y, z, Z_part):
+    def __init__(self, index, element, x, y, z, Z_part):
+        self._index = index
         self._element = element
         self._x = x
         self._y = y
         self._z = z
         self._Z_part = Z_part
 
+    def get_index(self):
+        return self._index
+
     def get_element(self):
-        return self._element
+        return self._element + "_e"
 
     def get_x(self):
         return self._x
@@ -81,6 +88,28 @@ class PositionedAtom:
         else:
             return None
 
+    def __str__(self):
+        return self._element + "(" + str(self._index) + ")"
+
+
+class Bond:
+    def __init__(self, atom_0, atom_1, bond_type):
+        self._atom_0 = atom_0
+        self._atom_1 = atom_1
+        self._bond_type = bond_type
+
+    def get_first_atom(self):
+        return self._atom_0
+
+    def get_second_atom(self):
+        return self._atom_1
+
+    def get_bond_type(self):
+        return self._bond_type
+
+    def __str__(self):
+        return str(self._atom_0) + "-" + self._bond_type + "-" + str(self._atom_1)
+
 
 class Molecule:
     def __init__(self):
@@ -88,6 +117,9 @@ class Molecule:
 
     def get_n_a(self):
         return self._n_a
+
+    def get_n_b(self):
+        return len(self._bonds)
 
     def get_model(self):
         return self._model
@@ -97,6 +129,9 @@ class Molecule:
 
     def get_atom(self, index):
         return self._atoms[index]
+
+    def get_bond(self, index):
+        return self._bonds[index]
 
     def get_freq_count(self):
         return len(self._freqs)
@@ -148,7 +183,7 @@ class Molecule:
             z = float(xyz_props[3].replace("*^", "E")) # z (angstrom) - Z coordinate
             Z_part = float(xyz_props[4].replace("*^", "E")) # Z_part (e) - Mulliken partial charge 
             
-            atom = PositionedAtom(element, x, y, z, Z_part)
+            atom = PositionedAtom(i, element, x, y, z, Z_part)
             m._props["E_atomization"] -= atom.get_U_0()
 
             m._atoms.append(atom)
@@ -161,7 +196,17 @@ class Molecule:
 
         # RDKit model
         m_rd = Chem.AddHs(Chem.MolFromSmiles(m._SMILES))
-        
+       
+        # Make bond list
+        m._bonds = []
+        for i in range(m_rd.GetNumBonds()):
+            bond_i = m_rd.GetBondWithIdx(i)
+            bond_type = str(bond_i.GetBondType())
+            begin_atom = str(bond_i.GetBeginAtomIdx())
+            end_atom = str(bond_i.GetEndAtomIdx())
+            m._bonds.append(Bond(m._atoms[bond_i.GetBeginAtomIdx()], m._atoms[bond_i.GetEndAtomIdx()], bond_type))
+            ATOMIC_RELATIONS_LOADED.add(bond_type)
+
         #### FOL Relational structure ####
         domain = [str(i) for i in range(m_rd.GetNumAtoms())]
         properties = ATOMIC_PROPERTIES
@@ -184,6 +229,9 @@ class Molecule:
             end_atom = str(bond_i.GetEndAtomIdx())
             bond_property_index = ATOMIC_RELATION_INDICES[bond_type]
             binary_rel_sets[bond_property_index].add((begin_atom, end_atom))
+            # Keeping this makes double counts on satisfying bonds between common elements
+            # When computing bond counts
+            binary_rel_sets[bond_property_index].add((end_atom, begin_atom))
 
         for i in range(len(property_sets)):
             v.append((properties[i], property_sets[i]))
@@ -195,6 +243,15 @@ class Molecule:
         #### END FOL ####
 
         return m
+
+    def get_structure_str(self):
+        s = ""
+
+        for i in range(len(self._bonds)):
+            s += str(self._bonds[i]) + "\n"
+
+        return s
+
 
     @staticmethod
     def from_xyz_file(file_path):

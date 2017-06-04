@@ -32,6 +32,9 @@ class FeatureFormIndicatorType(feature.FeatureType):
         return FeatureFormIndicatorToken(self._open_form.get_closed_forms()[index])
 
     def equals(self, feature_type):
+        if not isinstance(feature_type, FeatureFormIndicatorType):
+            return False
+
         my_g = self._open_form.get_init_g()
         g = feature_type.get_open_form().get_init_g()
 
