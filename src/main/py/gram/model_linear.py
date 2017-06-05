@@ -64,9 +64,9 @@ class PredictionModel(object):
 
         expand_f = []
         for i in range(len(w)):
-            if w[i] > t:
+            if abs(w[i]) > t:
                 expand_f.append(F.get_feature_token(i))
-
+        
         new_f = R.apply(expand_f)
         M.extend(new_f)
 

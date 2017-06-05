@@ -22,8 +22,8 @@ U_0_F = -99.718730
 # NOTE: It's necessary that predicate names are greater than one character
 # so that nltk doesn't stupidly treat them as variables... :(
 ATOMIC_PROPERTIES = ["H_e", "C_e", "N_e", "O_e", "F_e"]
+ATOMIC_PROPERTIES_NOH = ["C_e", "N_e", "O_e", "F_e"]
 ATOMIC_RELATIONS = Chem.rdchem.BondType.names.keys()
-ATOMIC_RELATIONS_LOADED = set([])
 
 ATOMIC_PROPERTY_INDICES = dict()
 ATOMIC_RELATION_INDICES = dict()
@@ -146,7 +146,7 @@ class Molecule:
         return self._model
 
     @staticmethod
-    def from_xyz(xyz):
+    def from_xyz(xyz, bond_type_counts=None, includeHs=False):
         m = Molecule()
         lines = xyz.split("\n")
 
@@ -195,7 +195,9 @@ class Molecule:
         m._SMILES = SMILES[len(SMILES)-1]
 
         # RDKit model
-        m_rd = Chem.AddHs(Chem.MolFromSmiles(m._SMILES))
+        m_rd = Chem.MolFromSmiles(m._SMILES)
+        if includeHs:
+            m_rd = Chem.AddHs(m_rd)
        
         # Make bond list
         m._bonds = []
@@ -205,7 +207,11 @@ class Molecule:
             begin_atom = str(bond_i.GetBeginAtomIdx())
             end_atom = str(bond_i.GetEndAtomIdx())
             m._bonds.append(Bond(m._atoms[bond_i.GetBeginAtomIdx()], m._atoms[bond_i.GetEndAtomIdx()], bond_type))
-            ATOMIC_RELATIONS_LOADED.add(bond_type)
+            
+            if bond_type_counts is not None:
+                if bond_type not in bond_type_counts:
+                    bond_type_counts[bond_type] = 0
+                bond_type_counts[bond_type] += 1
 
         #### FOL Relational structure ####
         domain = [str(i) for i in range(m_rd.GetNumAtoms())]
@@ -254,9 +260,9 @@ class Molecule:
 
 
     @staticmethod
-    def from_xyz_file(file_path):
+    def from_xyz_file(file_path, bond_type_counts=None, includeHs=False):
         xyz = None
         with open(file_path, 'r') as content_file:
              xyz = content_file.read()
-        return Molecule.from_xyz(xyz)
+        return Molecule.from_xyz(xyz, bond_type_counts, includeHs)
 

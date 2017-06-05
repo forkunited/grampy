@@ -89,6 +89,7 @@ class DataFeatureMatrix:
     def _compute(self):
         self._mat = []
         for i in range(self._data.get_size()):
+            print "Computing (" + str(i) + ") with " + str(self._feature_set.get_size())
             self._mat.append(self._feature_set.compute(self._data.get(i)))
 
     def shuffle(self):

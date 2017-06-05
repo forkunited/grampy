@@ -20,7 +20,7 @@ class TestChemData(unittest.TestCase):
         D = cdata.DataSet.make_from_xyz_dir(DATA_DIR, "H", max_size=1)
         atomic_domain = D.get_molecule_domain()
 
-        f = fbond.FeatureAtomicBondType(atomic_domain)
+        f = fbond.FeatureAtomicBondType(atomic_domain, D.get_bond_types())
         F = feature.FeatureSet()
         F.add_feature_type(f)
         

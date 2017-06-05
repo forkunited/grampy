@@ -12,13 +12,17 @@ def _unordered_sat_count(datum, sats):
     return len(unordered_sats)
 
 class FeatureAtomicBondType(fwextconj.FeatureFormWextconjType):
-    def __init__(self, molecule_domain, weight_type=WEIGHT_UNORDERED_SAT_COUNT):
-        fwextconj.FeatureFormWextconjType.__init__(self, self._make_bond_conjuncts(molecule_domain), self._get_weight_fn(weight_type))
+    def __init__(self, molecule_domain, atomic_relations, weight_type=WEIGHT_UNORDERED_SAT_COUNT, includeHs=False):
+        fwextconj.FeatureFormWextconjType.__init__(self, self._make_bond_conjuncts(molecule_domain, atomic_relations, includeHs), self._get_weight_fn(weight_type))
 
-    def _make_bond_conjuncts(self, molecule_domain):
-        atom_x_conjs = [fol.OpenFormula(molecule_domain, prop + "(x)", ["x"]) for prop in chem.ATOMIC_PROPERTIES]
-        atom_y_conjs = [fol.OpenFormula(molecule_domain, prop  + "(y)", ["y"]) for prop in chem.ATOMIC_PROPERTIES]
-        bond_xy_conjs = [fol.OpenFormula(molecule_domain, bond + "(x,y)", ["x","y"]) for bond in chem.ATOMIC_RELATIONS_LOADED]
+    def _make_bond_conjuncts(self, molecule_domain, atomic_relations, includeHs):
+        props = chem.ATOMIC_PROPERTIES_NOH
+        if includeHs:
+            props = chem.ATOMIC_PROPERTIES
+
+        atom_x_conjs = [fol.OpenFormula(molecule_domain, prop + "(x)", ["x"]) for prop in props]
+        atom_y_conjs = [fol.OpenFormula(molecule_domain, prop  + "(y)", ["y"]) for prop in props]
+        bond_xy_conjs = [fol.OpenFormula(molecule_domain, bond + "(x,y)", ["x","y"]) for bond in atomic_relations]
 
         return [atom_x_conjs, bond_xy_conjs, atom_y_conjs]
 

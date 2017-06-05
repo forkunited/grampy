@@ -1,3 +1,5 @@
+import operator
+
 import gram.data as data
 import gram.chem.rep as chem
 import gram.fol.rep as fol
@@ -9,6 +11,7 @@ class Datum(gram.fol.data.Datum):
     def __init__(self, molecule, value):
         self._molecule = molecule
         self._value = value
+        self._label = value
 
     def get_value(self):
         return self._value
@@ -23,12 +26,24 @@ class DataSet(gram.fol.data.DataSet):
     def __init__(self):
         data.DataSet.__init__(self)
         self._molecule_domain = ["0"]
+        self._bond_type_counts = dict()
 
     def get_molecule_domain(self):
         return self._molecule_domain
 
+    def get_bond_type_counts(self):
+        return self._bond_type_counts
+
+    def get_bond_types(self):
+        return self._bond_type_counts.keys()
+
+    def get_top_bond_types(self, k):
+        tuples = sorted(self._bond_type_counts.items(), key=operator.itemgetter(1))
+        tuples.reverse()
+        return [tuples[i][0] for i in range(min(k, len(tuples)))]
+
     @staticmethod
-    def make_from_xyz_dir(dir_path, value_property, max_size=None):
+    def make_from_xyz_dir(dir_path, value_property, max_size=None, includeHs=False):
         xyz_file_names = sorted(listdir(dir_path))
         xyz_files = []
         i = 0
@@ -46,7 +61,7 @@ class DataSet(gram.fol.data.DataSet):
         for xyz_file in xyz_files:
             if max_size is not None and i == max_size:
                 break
-            m = chem.Molecule.from_xyz_file(xyz_file)
+            m = chem.Molecule.from_xyz_file(xyz_file, D._bond_type_counts, includeHs)
 
             if m.get_n_a() > len(D._molecule_domain):
                 D._molecule_domain = [str(i) for i in range(m.get_n_a())]
