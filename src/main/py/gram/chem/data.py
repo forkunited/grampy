@@ -22,6 +22,12 @@ class Datum(gram.fol.data.Datum):
     def get_model(self):
         return self._molecule.get_model()
 
+    @staticmethod 
+    def get_coulomb_matrix_fn(dimension):
+        fn = lambda d : d.get_molecule().calculate_multilayer_coulomb_matrix(dimension=dimension)
+        fn.__name__ = "Coulomb" # FIXME Hack
+        return fn
+
 class DataSet(gram.fol.data.DataSet):
     def __init__(self):
         data.DataSet.__init__(self)
@@ -62,6 +68,8 @@ class DataSet(gram.fol.data.DataSet):
             if max_size is not None and i == max_size:
                 break
             m = chem.Molecule.from_xyz_file(xyz_file, D._bond_type_counts, includeHs)
+            if m is None:
+                continue
 
             if m.get_n_a() > len(D._molecule_domain):
                 D._molecule_domain = [str(i) for i in range(m.get_n_a())]

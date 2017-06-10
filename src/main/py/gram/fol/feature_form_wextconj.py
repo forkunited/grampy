@@ -2,6 +2,8 @@
 
 from gram import feature
 import copy
+import nltk
+import numpy as np
 
 def _form_cmp(x,y):
     if x.is_unary_predicate() and not y.is_unary_predicate():
@@ -12,9 +14,9 @@ def _form_cmp(x,y):
         return (y.get_form() > x.get_form()) - (y.get_form() < x.get_form())
 
 class FeatureFormWextconjToken(feature.FeatureToken):
-    def __init__(self, conjuncts, weight_fn, symmetric_rels=True):
+    def __init__(self, conjuncts, weight_fn, symmetric_rels=True, distinct_bindings=True, normalize=True):
         feature.FeatureToken.__init__(self)
-        
+
         cs = list(conjuncts)        
 
         # FIXME Want this to sort by forms with variables removed (so that order is independent of 
@@ -41,8 +43,63 @@ class FeatureFormWextconjToken(feature.FeatureToken):
 
         self._conjuncts = cs
 
+        self._conjuncts_opt_ordered = self._make_conjuncts_opt_ordered()
+
         self._open_conj = self._make_open_conj(cs)
         self._weight_fn = weight_fn
+        self._distinct_bindings = distinct_bindings
+
+        self._normalize = normalize
+        self._mean = None
+        self._sd = None
+
+    def _make_conjuncts_opt_ordered(self):
+        vars_to_unary = dict()
+        vars_to_nonunary = dict()
+        variables = set([])
+        conjs_ord = []
+
+        for i in range(len(self._conjuncts)):
+            conj = self._conjuncts[i]
+            if conj.is_unary_predicate():
+                for var in conj.get_variables():
+                    if var not in vars_to_unary:
+                        vars_to_unary[var] = []
+                    vars_to_unary[var].append(i)
+                    variables.add(var)
+            else:
+                for var in conj.get_variables():
+                    if var not in vars_to_nonunary:
+                        vars_to_nonunary[var] = []
+                    vars_to_nonunary[var].append(i)
+                    variables.add(var)
+        
+        added_conjs = set([])
+        for var in variables:
+            if var in vars_to_unary:
+                unary_indices = vars_to_unary[var]
+                for unary_i in unary_indices:
+                    if unary_i not in added_conjs:
+                        conjs_ord.append(self._conjuncts[unary_i])
+                        added_conjs.add(unary_i)
+
+            if var not in vars_to_nonunary:
+                continue
+ 
+            nonunary_indices = vars_to_nonunary[var]
+            for nonunary_i in nonunary_indices:
+                if nonunary_i not in added_conjs:
+                    nonunary_conj = self._conjuncts[nonunary_i]
+                    conjs_ord.append(nonunary_conj)
+                    added_conjs.add(nonunary_i)
+                    cur_vars = nonunary_conj.get_variables()
+                    for cur_var in cur_vars:
+                        cur_unary_indices = vars_to_unary[cur_var]
+                        for cur_unary_i in cur_unary_indices:
+                            if cur_unary_i not in added_conjs:
+                                conjs_ord.append(self._conjuncts[cur_unary_i])
+                                added_conjs.add(cur_unary_i)
+        return conjs_ord
 
     def _make_open_conj(self, conjuncts):
         open_conj = conjuncts[0]
@@ -65,9 +122,50 @@ class FeatureFormWextconjToken(feature.FeatureToken):
     def __str__(self):
         return str(self._open_conj.get_form()) + "_" + self._weight_fn.__name__ # FIXME Hack
 
+    def _compute_helper(self, model, conj_index, partial_g_internal, partial_values):
+        partial_g = partial_g_internal #nltk.Assignment(self._conjuncts[0].get_domain(), partial_g_internal)
+        if conj_index < 0:
+            return [partial_g]
+
+        conj_i = self._conjuncts_opt_ordered[conj_index]
+        sats_i = conj_i.satisfiers_broken_fast(model, partial_g) #conj_i.satisfiers(model, g=partial_g)
+        sats = []
+        for sat in sats_i:
+            partial_g_next = dict() # []
+            partial_values_next = copy.copy(partial_values)
+            #for assn in partial_g_internal:
+            #    partial_g_next.append(assn)
+            
+            for key in partial_g:
+                partial_g_next[key] = partial_g[key]
+
+            failed_distinct = False
+            for var in sat:
+                if var not in partial_g:
+                    #partial_g_next.append((var, sat[var]))
+                    partial_g_next[var] = sat[var]
+                    if self._distinct_bindings and sat[var] in partial_values_next:
+                        failed_distinct = True
+                        break
+                    partial_values_next.add(sat[var])
+            
+            if not failed_distinct:
+                sats.extend(self._compute_helper(model, conj_index-1, partial_g_next, partial_values_next))
+        return sats
+
     def compute(self, datum):
-        sats = self._open_conj.satisfiers(datum.get_model()) 
-        return self._weight_fn(datum, sats)
+        # NOTE Old slow way
+        #sats = self._open_conj.satisfiers(datum.get_model()) 
+        
+        # NOTE Faster?
+        sats = self._compute_helper(datum.get_model(), len(self._conjuncts)-1, dict(), set([])) # Change dict to [] if want to use nltk assignments
+        # End faster?
+
+        weight = self._weight_fn(datum, sats)
+        if self._normalize and self._mean is not None:
+            return (weight - self._mean)/self._sd
+        else:
+            return weight
 
     def equals(self, feature_token):
         if not isinstance(feature_token, FeatureFormWextconjToken):
@@ -82,12 +180,31 @@ class FeatureFormWextconjToken(feature.FeatureToken):
 
         return True
 
+    def init_start(self):
+        self._init_normalize = self._normalize
+        self._normalize = False
+        self._mean = 0.0
+        self._sd = 0.0
+        self._init_values = []
+
+    def init_datum(self, datum):
+        self._init_values.append(self.compute(datum))
+
+    def init_end(self):
+        self._mean = np.mean(self._init_values)
+        self._sd = np.std(self._init_values)
+        if self._sd == 0.0:
+            self._sd = 1.0
+
+        self._normalize = self._init_normalize
+        self._init_values = None
 
 class FeatureFormWextconjType(feature.FeatureType):
-    def __init__(self, conjunct_lists, weight_fn, symmetric_rels=True):
+    def __init__(self, conjunct_lists, weight_fn, symmetric_rels=True, distinct_bindings=True):
         feature.FeatureType.__init__(self)
 
         self._symmetric_rels = symmetric_rels
+        self._distinct_bindings = distinct_bindings
 
         self._conjunct_lists = []
         for conjunct_list in conjunct_lists:
@@ -113,7 +230,7 @@ class FeatureFormWextconjType(feature.FeatureType):
 
     def _make_feature_tokens_helper(self, conj_index, partial_conjs):
         if conj_index == len(self._conjunct_lists):
-            return [FeatureFormWextconjToken(partial_conjs, self._weight_fn, symmetric_rels=self._symmetric_rels)]
+            return [FeatureFormWextconjToken(partial_conjs, self._weight_fn, symmetric_rels=self._symmetric_rels, distinct_bindings=self._distinct_bindings)]
 
         tokens = []
         for conj in self._conjunct_lists[conj_index]:
@@ -146,4 +263,16 @@ class FeatureFormWextconjType(feature.FeatureType):
                 return False
 
         return True
+
+    def init_start(self):
+        for token in self._tokens:
+            token.init_start()
+
+    def init_datum(self, datum):
+        for token in self._tokens:
+            token.init_datum(datum)
+
+    def init_end(self):
+        for token in self._tokens:
+            token.init_end()
 

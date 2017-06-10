@@ -36,8 +36,16 @@ class RuleSet:
         for i in range(len(feature_tokens)):
             self._apply_unary_rules(feature_tokens[i], results)
             for j in range(0, len(feature_tokens)):
-                if i != j:
-                    self._apply_binary_rules(feature_tokens[i], feature_tokens[j], results)
+                self._apply_binary_rules(feature_tokens[i], feature_tokens[j], results)
         return results
 
+    def apply_unary_binary(self, unary, binary):
+        results = []
+        for i in range(len(unary)):
+            self._apply_unary_rules(unary[i], results)
+
+        for i in range(len(binary)):
+            self._apply_binary_rules(binary[i][0], binary[i][1], results)
+        
+        return results
 

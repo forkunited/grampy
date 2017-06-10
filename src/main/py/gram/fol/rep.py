@@ -10,15 +10,143 @@ class RelationalModel:
         self._properties = properties
         self._binary_rels = binary_rels
         self._model = nltk.Model(set(domain), nltk.Valuation(valuation))
+        
+        self._preds = dict()
+        self._pred_sats = dict()
+        for (pred, sats) in valuation:
+            self._preds[pred] = sats
+            
+            if pred in binary_rels:
+                sat_map_0 = dict()
+                sat_map_1 = dict()
+                for sat in sats:
+                    if sat[0] not in sat_map_0:
+                        sat_map_0[sat[0]] = set([])
+                    if sat[1] not in sat_map_1:
+                        sat_map_1[sat[1]] = set([])
+                    sat_map_1[sat[1]].add(sat[0])
+                    sat_map_0[sat[0]].add(sat[1])
+                self._pred_sats[pred] = (sat_map_0, sat_map_1)
+            elif pred in properties:
+                sat_set = set([])
+                for sat in sats:
+                    sat_set.add(sat)
+                self._pred_sats[pred] = sat_set
 
     def evaluate(self, form, g):
-        return self._model.evaluate(form, g)
+        return self._model.evaluate_exp(nltk.sem.Expression.fromstring(form), g)
+
+    def evaluate_exp(self, exp, g):
+        return self._model.satisfy(exp, g)
 
     def satisfiers(self, form, var, g):
-        return self._model.satisfiers(nltk.sem.Expression.fromstring(form), var, g)
+        return self.satisfiers_exp(nltk.sem.Expression.fromstring(form), var, g)
 
-    def satisfiers_exp(self, expr, var, g):
-        return self._model.satisfiers(expr, var, g)
+    def satisfiers_exp(self, exp, var, g):
+        return self._model.satisfiers(exp, var, g)
+
+    # NOTE: This assumes there are no constants
+    def satisfying_assignments_exp_app_fast(self, exp, g):
+        if not isinstance(exp, nltk.sem.logic.ApplicationExpression):
+            return None
+
+        pred_vars = []
+        for arg in exp.args:
+            if not isinstance(arg, nltk.sem.logic.IndividualVariableExpression):
+                return None
+            else:
+                pred_vars.append(str(arg))
+
+        assgns = []
+        pred_str = str(exp.pred)
+        if not pred_str in self._preds:
+            return assgns
+
+        pred = self._preds[pred_str]
+        for sat in pred:
+            assgn = []
+            consistent = True
+            for i in range(len(sat)):
+                var_i = pred_vars[i]
+                val_i = sat[i]
+                
+                if var_i in g:
+                    if g[var_i] != val_i:
+                        consistent = False
+                        break
+                else:
+                    assgn.append((var_i, val_i))
+            
+            if consistent:
+                for var in g:
+                    assgn.append((var, g[var]))
+                assgns.append(nltk.Assignment(self._domain, assgn))
+                
+        return assgns
+
+    # NOTE: This assumes there are no constants
+    def satisfying_assignments_app_fast_nonltk(self, pred_str, pred_vars, g):
+        assgns = []
+        if not pred_str in self._preds:
+            return assgns
+
+        pred = self._preds[pred_str]
+        
+        if len(pred_vars) == 1:
+            if pred_vars[0] not in g:
+                for sat in self._pred_sats[pred_str]:
+                    assgn = copy.copy(g)
+                    assgn[pred_vars[0]] = sat
+                    assgns.append(assgn)
+            elif g[pred_vars[0]] in self._pred_sats[pred_str]:
+                assgns.append(copy.copy(g))
+         
+            return assgns
+        elif len(pred_vars) == 2:
+
+            if pred_vars[0] not in g and pred_vars[1] not in g:
+                for sat in pred:
+                    assgn = copy.copy(g)
+                    assgn[pred_vars[0]] = sat[0]
+                    assgn[pred_vars[1]] = sat[1]
+                    assgns.append(assgn)
+            elif pred_vars[0] in g and pred_vars[1] not in g:
+                if g[pred_vars[0]] in self._pred_sats[pred_str][0]:
+                    for sat in self._pred_sats[pred_str][0][g[pred_vars[0]]]:
+                        assgn = copy.copy(g)
+                        assgn[pred_vars[1]] = sat
+                        assgns.append(assgn)
+            elif pred_vars[1] in g and pred_vars[0] not in g:
+                if g[pred_vars[1]] in self._pred_sats[pred_str][1]:
+                    for sat in self._pred_sats[pred_str][1][g[pred_vars[1]]]:
+                        assgn = copy.copy(g)
+                        assgn[pred_vars[0]] = sat
+                        assgns.append(assgn)
+            elif g[pred_vars[0]] in self._pred_sats[pred_str][0] and g[pred_vars[1]] in self._pred_sats[pred_str][0][g[pred_vars[0]]]:
+                assgns.append(copy.copy(g))
+            return assgns
+        
+        for sat in pred:
+            assgn = dict()
+            consistent = True
+            for i in range(len(sat)):
+                var_i = pred_vars[i]
+                val_i = sat[i]
+
+                if var_i in g:
+                    if g[var_i] != val_i:
+                        consistent = False
+                        break
+                else:
+                    assgn[var_i] = val_i
+
+            if consistent:
+                for var in g:
+                    assgn[var] = g[var]
+                assgns.append(assgn)
+
+        return assgns
+
 
     @staticmethod
     def make_random(domain, properties, binary_rels):
@@ -146,6 +274,7 @@ class OpenFormula:
         else:
             self._init_g = nltk.Assignment(self._domain, [])
         self._closed_forms = None
+        self._predicates = None
 
     def _make_closed_forms(self, domain, form, variables, init_g):
         assgn_lists = self._make_assignments_helper(domain, variables, init_g, 0, [[]])
@@ -182,6 +311,9 @@ class OpenFormula:
 
     def exp_matches(self, open_form):
         return self.get_exp().equiv(open_form.get_exp())
+
+    def get_domain(self):
+        return self._domain
 
     def get_form(self):
         return self._form
@@ -242,6 +374,11 @@ class OpenFormula:
     def negate(self):
         return OpenFormula(self._domain, str(- self._get_exp()), self._variables, self._init_g)
 
+    # FIXME This only works if the formula is a predicate
+    # Also assumes init_g is empty
+    def satisfiers_broken_fast(self, model, g):
+        return model.satisfying_assignments_app_fast_nonltk(self.get_predicates()[0], self.get_variables(), g)
+
     def _satisfiers_helper(self, model, variables, var_exprs, var_index, partial_g):
         if var_index == len(self._variables):
              return [nltk.Assignment(self._domain, partial_g)]
@@ -258,20 +395,53 @@ class OpenFormula:
 
         return sats
 
-    def satisfiers(self, model):
+    def satisfiers(self, model, g=None):
+        # First try the fast way if this is just a predicate expression
+        full_init_g_obj = None
+        if g is None:
+            full_init_g_obj = self._init_g
+        elif len(self._init_g) == 0:
+            full_init_g_obj = g
+        else:
+            full_init_g = []
+            for var in g:
+                full_init_g.append((var, g[var]))
+            for var in self._init_g:
+                if var not in g:
+                    full_init_g.append((var, self._init_g[var]))
+            full_init_g_obj = nltk.Assignment(self._domain, full_init_g)
+
+        maybe_sats = model.satisfying_assignments_exp_app_fast(self.get_exp(), full_init_g_obj)
+        if maybe_sats is not None:
+            return maybe_sats
+
+        # Otherwise, do the slow way
         variables = []
         partial_g = []
         var_exprs = []
         for i in range(len(self._variables)):
             var = self._variables[i]
-            if var not in self._init_g:
+            if var not in self._init_g and (g is None or var not in g):
                 exist_str_i = ""
                 for j in range(i+1, len(self._variables)):
                     exist_str_i += "exists " + self._variables[j] + "."
-                var_exprs.append(nltk.sem.Expression.fromstring(exist_str_i + self._form))
+                if len(exist_str_i) == 0:
+                    var_exprs.append(self.get_exp())
+                else:
+                    var_exprs.append(nltk.sem.Expression.fromstring(exist_str_i + self._form))
                 variables.append(var)
             else:
-                partial_g.append((var, self._init_g[var]))
+                if var in self._init_g:
+                    partial_g.append((var, self._init_g[var]))
+                else:
+                    partial_g.append((var, g[var]))
+        
+        if len(variables) == 0:
+            partial_g_obj = nltk.Assignment(self._domain, partial_g)
+            if model.evaluate_exp(self.get_exp(), partial_g_obj):
+                return [partial_g_obj]
+            else:
+                return []
 
         return self._satisfiers_helper(model, variables, var_exprs, 0, partial_g)
 
@@ -279,7 +449,9 @@ class OpenFormula:
         return isinstance(self.get_exp(), nltk.sem.logic.ApplicationExpression) and (len(self.get_exp().free()) + len(self.get_exp().constants())) == 1
 
     def get_predicates(self):
-        return [str(pred) for pred in self.get_exp().predicates()]
+        if self._predicates is None:
+            self._predicates = [str(pred) for pred in self.get_exp().predicates()]
+        return self._predicates
 
     def clone(self, var_map=dict(), symmetric=False):
         new_exp = self.get_exp()

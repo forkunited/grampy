@@ -9,6 +9,8 @@ class BinaryJoinPropertyRule(rule.BinaryRule):
     def matches(self, feature_token1, feature_token2):
         if not isinstance(feature_token1, feature_form_wextconj.FeatureFormWextconjToken) or not isinstance(feature_token2, feature_form_wextconj.FeatureFormWextconjToken):
             return False
+        if feature_token1.get_conjunct_count() <= 1 or feature_token2.get_conjunct_count() <= 1:
+            return False
         return True
         #f_form2 = feature_token2.get_closed_form()
         #if self._lhs_closed_form1.matches(f_form1) and self._lhs_closed_form2.matches(f_form2):

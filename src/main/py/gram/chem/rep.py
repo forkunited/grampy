@@ -1,4 +1,5 @@
 from rdkit import Chem
+import numpy as np
 import gram.fol.rep as fol
 
 # Energies of atoms for computing atomization energies for molecules
@@ -23,7 +24,8 @@ U_0_F = -99.718730
 # so that nltk doesn't stupidly treat them as variables... :(
 ATOMIC_PROPERTIES = ["H_e", "C_e", "N_e", "O_e", "F_e"]
 ATOMIC_PROPERTIES_NOH = ["C_e", "N_e", "O_e", "F_e"]
-ATOMIC_RELATIONS = Chem.rdchem.BondType.names.keys()
+ATOMIC_BONDS = Chem.rdchem.BondType.names.keys()
+ATOMIC_RELATIONS = ATOMIC_BONDS + ["BOND"]
 
 ATOMIC_PROPERTY_INDICES = dict()
 ATOMIC_RELATION_INDICES = dict()
@@ -47,6 +49,9 @@ class PositionedAtom:
 
     def get_element(self):
         return self._element + "_e"
+
+    def get_R(self):
+        return np.array([self._x, self._y, self._z])
 
     def get_x(self):
         return self._x
@@ -145,6 +150,58 @@ class Molecule:
     def get_model(self):
         return self._model
 
+    def get_structure_str(self):
+        s = ""
+
+        for i in range(len(self._bonds)):
+            s += str(self._bonds[i]) + "\n"
+
+        return s
+
+    def calculate_coulomb_matrix(self, dimension=None):
+        """
+        Calculate the sorted Coulomb matrix(for definition see Montavon et al.)
+        Outputs: sorted Coulomb matrices C
+        """
+        if dimension is None or dimension < self.get_n_a():
+            dimension = self.get_n_a() 
+
+        C = np.zeros((dimension, dimension))
+
+        for i in range(0, self.get_n_a()):
+            for j in range(0, self.get_n_a()):
+                if i == j:
+                    C[i,j]=0.5 * np.power(self.get_atom(i).get_Z(), 2.4)
+                else:
+                    R_diff = np.subtract(self.get_atom(i).get_R(), self.get_atom(j).get_R())
+                    norm = np.linalg.norm(R_diff)
+                    if norm == 0.0:
+                        C[i,j] = 0.0
+                    else:
+                        C[i,j]= self.get_atom(i).get_Z() * self.get_atom(j).get_Z() / norm
+
+        # Sort Coulomb matrix by norm of its rows
+        indexlist = np.argsort(np.linalg.norm(C,axis=0))
+        C = C[indexlist]
+        return C
+
+    def calculate_multilayer_coulomb_matrix(self, dimension=None, theta=1.0):
+        """
+        Create multi-layer binary C from C_sorted (Equation 4, Montavon et al.)
+        Output: Coulomb matrix C[dimension,dimension,3]
+        """
+
+        C = self.calculate_coulomb_matrix(dimension=dimension)
+        C_mult = np.zeros((dimension, dimension, 3))
+
+        for i in range(0, dimension):
+            for j in range(0, dimension):
+                C_mult[i,j,0] = np.tanh((C[i,j]-theta)/theta)
+                C_mult[i,j,1] = np.tanh(C[i,j]/theta)
+                C_mult[i,j,2] = np.tanh((C[i,j]+theta)/theta)
+        return C_mult
+
+
     @staticmethod
     def from_xyz(xyz, bond_type_counts=None, includeHs=False):
         m = Molecule()
@@ -196,6 +253,10 @@ class Molecule:
 
         # RDKit model
         m_rd = Chem.MolFromSmiles(m._SMILES)
+        if m_rd is None:
+            print "Failed to load molecule... (" + m._SMILES + ")"
+            return None
+
         if includeHs:
             m_rd = Chem.AddHs(m_rd)
        
@@ -239,6 +300,9 @@ class Molecule:
             # When computing bond counts
             binary_rel_sets[bond_property_index].add((end_atom, begin_atom))
 
+            binary_rel_sets[ATOMIC_RELATION_INDICES["BOND"]].add((begin_atom, end_atom))
+            binary_rel_sets[ATOMIC_RELATION_INDICES["BOND"]].add((end_atom, begin_atom))
+
         for i in range(len(property_sets)):
             v.append((properties[i], property_sets[i]))
 
@@ -249,15 +313,6 @@ class Molecule:
         #### END FOL ####
 
         return m
-
-    def get_structure_str(self):
-        s = ""
-
-        for i in range(len(self._bonds)):
-            s += str(self._bonds[i]) + "\n"
-
-        return s
-
 
     @staticmethod
     def from_xyz_file(file_path, bond_type_counts=None, includeHs=False):

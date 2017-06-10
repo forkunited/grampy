@@ -11,6 +11,14 @@ class FeatureFormIndicatorToken(feature.FeatureToken):
     def __str__(self):
         return str(self._closed_form)
 
+    def init_start(self):
+        pass
+
+    def init_datum(self, datum):
+        pass
+
+    def init_end(self):
+        pass
 
 class FeatureFormIndicatorType(feature.FeatureType):
     def __init__(self, open_form):
@@ -43,4 +51,13 @@ class FeatureFormIndicatorType(feature.FeatureType):
                 return False
 
         return self._open_form.exp_matches(feature_type.get_open_form())
+
+    def init_start(self):
+        pass
+
+    def init_datum(self, datum):
+        pass
+
+    def init_end(self):
+        pass
 

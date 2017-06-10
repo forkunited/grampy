@@ -15,9 +15,14 @@ class ModelType:
 class PredictionModel(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, w=None, F=None):
+    def __init__(self, w=None, F=None, max_expand_unary=None, max_expand_binary=None):
         self._w = w
         self._F = F
+
+        self._max_expand_unary = max_expand_unary
+        self._max_expand_binary = max_expand_binary
+        self._expanded_unary = set([])
+        self._expanded_binary = set([])
 
     @abc.abstractmethod
     def _gradient_i(self, M, i, w):
@@ -53,7 +58,7 @@ class PredictionModel(object):
 
     def _update_weights_l1(self, M, j, eta, w, u, q):
         g = self._gradient_i(M, j, w)
-        for i in range(len(M.get_matrix()[0])):
+        for i in M.get_non_zero_indices(j): # range(len(M.get_matrix()[0])):
             w[i] = w[i] + eta*g[i]
             if not isinstance(M.get_feature_set().get_feature_token(i), FeatureTopToken):
                 self._apply_penalty_l1(i, w, u, q)
@@ -62,13 +67,41 @@ class PredictionModel(object):
     def _extend_model_g(self, M, R, t, w, q):
         F = M.get_feature_set()
 
-        expand_f = []
+        expand_f_unary = []
         for i in range(len(w)):
             if abs(w[i]) > t:
-                expand_f.append(F.get_feature_token(i))
+                expand_f_unary.append((i, abs(w[i])))
         
-        new_f = R.apply(expand_f)
+        expand_f_binary = []
+        for (i, w_i) in expand_f_unary:
+            for (j, w_j) in expand_f_unary:
+                expand_f_binary.append((i, j, w_i*w_j))
+        
+        expand_f_unary.sort(key=lambda x : -x[1])
+        expand_f_binary.sort(key=lambda x : -x[2])
+
+        if self._max_expand_unary is not None:
+            expand_f_unary = expand_f_unary[:self._max_expand_unary] 
+
+        if self._max_expand_binary is not None:
+            expand_f_binary = expand_f_binary[:self._max_expand_binary]
+
+        unary_f = []
+        for (i, w_i) in expand_f_unary:
+            if i not in self._expanded_unary:
+                self._expanded_unary.add(i)
+                unary_f.append(F.get_feature_token(i))
+            
+        binary_f = []
+        for (i, j, w_ij) in expand_f_binary:
+            if (i,j) not in self._expanded_binary:
+                self._expanded_binary.add((i,j))
+                binary_f.append((F.get_feature_token(i), F.get_feature_token(j)))
+        
+        new_f = R.apply_unary_binary(unary_f, binary_f) 
         M.extend(new_f)
+
+        added = F.get_size() - len(w)
 
         new_w = np.zeros(F.get_size() - len(w))
         new_q = np.zeros(F.get_size() - len(q))
@@ -76,7 +109,7 @@ class PredictionModel(object):
         w = np.concatenate((w, new_w))
         q = np.concatenate((q, new_q))
 
-        return w, q
+        return w, q, added
 
 
     def _loss_l1(self, M, w, C):
@@ -168,7 +201,9 @@ class PredictionModel(object):
         nzs = []
         vals = []
 
-        for k in range(iterations):
+        actual_k = 0
+        k = 0
+        while k < iterations:
             eta = self._eta(k, eta_0, alpha, N)
             if k % N == 0:
                 M.shuffle()
@@ -187,7 +222,10 @@ class PredictionModel(object):
                 l1s.append(l1)
                 nzs.append(nz)
 
-                w, q = self._extend_model_g(M, R, t, w, q)
+                w, q, added = self._extend_model_g(M, R, t, w, q)
+                #if added > 0:
+                #    k = 0
+                #    eta = self._eta(k, eta_0, alpha, N)
                 iter_str = "Training l1-g model iteration " + str(k) + " eta: " + str(eta) + " loss: " + str(loss) + " l1: " + str(l1) + " nz: " + str(nz)
                 if val is not None:
                     iter_str += " eval: " + str(val)
@@ -198,6 +236,8 @@ class PredictionModel(object):
 
             j = k % N
             self._update_weights_l1(M, j, eta, w, u, q)
+            k += 1
+            actual_k += 1
 
         self._w = w
         self._F = F
@@ -266,6 +306,12 @@ class LinearModel(PredictionModel):
         return np.dot(w, X)
 
     def mu(self, datum):
+        #print self._w
+        #print self._F.compute(datum)
+        #print datum.get_molecule().get_structure_str()
+        #for i in range(self._F.get_size()):
+        #    print str(self._F.get_feature_token(i))
+
         return self._mu(self._w, self._F.compute(datum))
 
     def _gradient_i(self, M, i, w):

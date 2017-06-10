@@ -24,7 +24,9 @@ class RMSE(Evaluation):
         for i in range(data.get_size()):
             datum = data.get(i)
             l = datum.get_label()
-            l_hat = model.predict(datum)
+            l_hat = model.predict(datum, rand=False)
+            #if i < 3:
+            #   print str(l) + " " + str(l_hat) 
             rmse += (l-l_hat)*(l-l_hat)
         return np.sqrt(rmse/data.get_size())
 
@@ -38,7 +40,7 @@ class Accuracy(Evaluation):
         for i in range(data.get_size()):
             datum = data.get(i)
             l = datum.get_label()
-            l_hat = model.predict(datum)
+            l_hat = model.predict(datum, rand=False)
             if l == l_hat:
                 correct += 1
         return correct/data.get_size()
